@@ -1,0 +1,116 @@
+{
+  "name": "mirai-scientific-calculator",
+  "version": "0.1.0",
+  "description": "A reusable scientific, graphing, statistics, and math tools calculator for React.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openmirai/mirai-scientific-calculator.git"
+  },
+  "homepage": "https://github.com/openmirai/mirai-scientific-calculator#readme",
+  "bugs": {
+    "url": "https://github.com/openmirai/mirai-scientific-calculator/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "style": "./dist/styles.css",
+  "unpkg": "./dist/index.js",
+  "exports": {
+    ".": {
+      "style": "./dist/styles.css",
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./styles.css": "./dist/styles.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && node scripts/copy-cjs-types.mjs",
+    "build:demo": "vite build --mode demo --outDir demo-dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "publint": "publint",
+    "typecheck": "tsc -b --pretty false",
+    "check": "pnpm lint && pnpm test && pnpm build",
+    "prepack": "pnpm check"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-dom": ">=18.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@microsoft/api-extractor": "^7.58.12",
+    "@tailwindcss/vite": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "@vitest/coverage-v8": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "jsdom": "latest",
+    "publint": "^0.3.22",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "latest",
+    "tw-animate-css": "latest",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "latest",
+    "vite": "latest",
+    "vite-plugin-dts": "latest",
+    "vitest": "latest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org"
+  },
+  "keywords": [
+    "react",
+    "calculator",
+    "scientific-calculator",
+    "graphing-calculator",
+    "statistics",
+    "math-tools",
+    "vite",
+    "tailwindcss",
+    "shadcn"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.28.0",
+    "radix-ui": "^1.6.7",
+    "shadcn": "^4.16.0",
+    "tailwind-merge": "^3.6.0"
+  }
+}

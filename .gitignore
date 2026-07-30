@@ -1,0 +1,9 @@
+node_modules
+dist
+demo-dist
+coverage
+.omx/
+.DS_Store
+*.local
+*.tgz
+coverage
