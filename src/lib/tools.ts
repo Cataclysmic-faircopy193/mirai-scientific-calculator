@@ -1,10 +1,44 @@
-import { greatestCommonDivisor } from "@/lib/calculator-engine"
+function requireFinite(values: number[]): void {
+  if (values.some((value) => !Number.isFinite(value))) {
+    throw new Error("Tool inputs must be finite numbers")
+  }
+}
 
-function decimalPlaces(value: number): number {
-  const [coefficient, exponentSource] = String(value).toLowerCase().split("e")
-  const fractionLength = coefficient.split(".")[1]?.length ?? 0
-  const exponent = Number(exponentSource ?? 0)
-  return Math.max(0, Math.min(12, fractionLength - exponent))
+interface DecimalInteger {
+  coefficient: bigint
+  decimalPlaces: number
+}
+
+function decimalInteger(value: number): DecimalInteger {
+  const [coefficientSource, exponentSource = "0"] = String(value)
+    .toLowerCase()
+    .split("e")
+  const negative = coefficientSource.startsWith("-")
+  const unsigned = coefficientSource.replace(/^[+-]/, "")
+  const [whole, fraction = ""] = unsigned.split(".")
+  const digits = `${whole}${fraction}`.replace(/^0+(?=\d)/, "") || "0"
+  return {
+    coefficient: BigInt(`${negative ? "-" : ""}${digits}`),
+    decimalPlaces: fraction.length - Number(exponentSource),
+  }
+}
+
+function bigintGcd(left: bigint, right: bigint): bigint {
+  let a = left < 0n ? -left : left
+  let b = right < 0n ? -right : right
+  while (b !== 0n) {
+    ;[a, b] = [b, a % b]
+  }
+  return a
+}
+
+function scaledBigint(value: bigint, decimalPlaces: number): number {
+  return Number(`${value}e${-decimalPlaces}`)
+}
+
+function stableMidpoint(left: number, right: number): number {
+  const sum = left + right
+  return Number.isFinite(sum) ? sum / 2 : left / 2 + right / 2
 }
 
 export interface PercentResults {
@@ -18,6 +52,7 @@ export function calculatePercent(
   percent: number,
   value: number,
 ): PercentResults {
+  requireFinite([percent, value])
   const rate = percent / 100
   return {
     portion: value * rate,
@@ -42,24 +77,36 @@ export function calculateRatio(
   right: number,
   scale: number,
 ): RatioResults {
-  const multiplier =
-    10 ** Math.max(decimalPlaces(left), decimalPlaces(right))
-  const integerLeft = Math.round(left * multiplier)
-  const integerRight = Math.round(right * multiplier)
-  const integerGcd = greatestCommonDivisor(integerLeft, integerRight)
-  const simplifier = integerGcd || 1
-  const gcd = integerGcd / multiplier
+  requireFinite([left, right, scale])
+  const leftDecimal = decimalInteger(left)
+  const rightDecimal = decimalInteger(right)
+  const decimalPlaces = Math.max(
+    0,
+    leftDecimal.decimalPlaces,
+    rightDecimal.decimalPlaces,
+  )
+  const integerLeft =
+    leftDecimal.coefficient *
+    10n ** BigInt(decimalPlaces - leftDecimal.decimalPlaces)
+  const integerRight =
+    rightDecimal.coefficient *
+    10n ** BigInt(decimalPlaces - rightDecimal.decimalPlaces)
+  const integerGcd = bigintGcd(integerLeft, integerRight)
+  const simplifier = integerGcd || 1n
+  const gcd = scaledBigint(integerGcd, decimalPlaces)
+  const integerLcm =
+    integerGcd === 0n
+      ? 0n
+      : ((integerLeft < 0n ? -integerLeft : integerLeft) / integerGcd) *
+        (integerRight < 0n ? -integerRight : integerRight)
   return {
-    simplifiedLeft: integerLeft / simplifier,
-    simplifiedRight: integerRight / simplifier,
+    simplifiedLeft: Number(integerLeft / simplifier),
+    simplifiedRight: Number(integerRight / simplifier),
     scaledLeft: left * scale,
     scaledRight: right * scale,
     decimal: right === 0 ? Number.NaN : left / right,
-    gcd: integerGcd === 0 ? 0 : gcd,
-    lcm:
-      left === 0 || right === 0
-        ? 0
-        : Math.abs(left * right) / gcd,
+    gcd,
+    lcm: scaledBigint(integerLcm, decimalPlaces),
   }
 }
 
@@ -76,12 +123,33 @@ export function calculateCoordinates(
   x2: number,
   y2: number,
 ): CoordinateResults {
+  requireFinite([x1, y1, x2, y2])
+  const coordinateScale = Math.max(
+    Math.abs(x1),
+    Math.abs(y1),
+    Math.abs(x2),
+    Math.abs(y2),
+  )
+  const normalizedDx =
+    coordinateScale === 0 ? 0 : x2 / coordinateScale - x1 / coordinateScale
+  const normalizedDy =
+    coordinateScale === 0 ? 0 : y2 / coordinateScale - y1 / coordinateScale
   const dx = x2 - x1
   const dy = y2 - y1
-  const slope = dx === 0 ? null : dy / dx
+  const slope =
+    normalizedDx === 0
+      ? null
+      : Number.isFinite(dx) && Number.isFinite(dy)
+        ? dy / dx
+        : normalizedDy / normalizedDx
   return {
-    distance: Math.hypot(dx, dy),
-    midpoint: [(x1 + x2) / 2, (y1 + y2) / 2],
+    distance:
+      coordinateScale === 0
+        ? 0
+        : Number.isFinite(dx) && Number.isFinite(dy)
+          ? Math.hypot(dx, dy)
+          : Math.hypot(normalizedDx, normalizedDy) * coordinateScale,
+    midpoint: [stableMidpoint(x1, x2), stableMidpoint(y1, y2)],
     slope,
     intercept: slope === null ? null : y1 - slope * x1,
   }
@@ -100,6 +168,7 @@ export function calculateShapes(
   height: number,
   depth: number,
 ): ShapeResults {
+  requireFinite([radius, base, height, depth])
   return {
     circleArea: Math.PI * radius ** 2,
     circumference: 2 * Math.PI * radius,

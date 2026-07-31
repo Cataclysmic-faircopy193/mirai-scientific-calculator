@@ -1,6 +1,6 @@
 {
   "name": "mirai-scientific-calculator",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A reusable scientific, graphing, statistics, and math tools calculator for React.",
   "repository": {
     "type": "git",
@@ -71,6 +71,7 @@
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
+    "fast-check": "^4.9.0",
     "globals": "latest",
     "jsdom": "latest",
     "publint": "^0.3.22",

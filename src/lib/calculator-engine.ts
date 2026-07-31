@@ -236,6 +236,12 @@ const SCALAR_FUNCTION_ARITY: Record<string, number | readonly [number, number]> 
   round: [1, 2],
 }
 
+const MAX_EXPRESSION_LENGTH = 4096
+const MAX_TOKENS = 512
+const MAX_AST_CACHE_ENTRIES = 256
+const MAX_DEFINITIONS = 128
+const MAX_VARIABLES = 128
+
 function isNumericArray(value: CalculatorValue): value is number[] {
   return Array.isArray(value)
 }
@@ -251,6 +257,47 @@ function cleanNumber(value: number): number {
   if (Math.abs(value) < 1e-12) return 0
   if (Math.abs(value - Math.round(value)) < 1e-12) return Math.round(value)
   return value
+}
+
+function shiftDecimal(value: number, exponent: number): number {
+  const [coefficient, currentExponent = "0"] = String(value).split("e")
+  return Number(`${coefficient}e${Number(currentExponent) + exponent}`)
+}
+
+function roundDecimal(value: number, precision: number): number {
+  const absolute = Math.abs(value)
+  const shifted = shiftDecimal(absolute, precision)
+  if (!Number.isFinite(shifted)) return value
+
+  const rounded = Math.floor(shifted + 0.5)
+  const result = shiftDecimal(rounded, -precision)
+  if (result === 0) return 0
+  return value < 0 ? -result : result
+}
+
+function approximatelyEqual(left: number, right: number): boolean {
+  if (left === right) return true
+  return (
+    Math.abs(left - right) <=
+    Number.EPSILON * 4 * Math.max(1, Math.abs(left), Math.abs(right))
+  )
+}
+
+function validateFiniteRecord(
+  values: Record<string, number>,
+  label: string,
+): void {
+  if (Object.keys(values).length > MAX_VARIABLES) {
+    throw new Error(`${label} contains too many values`)
+  }
+  for (const [name, value] of Object.entries(values)) {
+    if (!/^[a-z]$/i.test(name)) {
+      throw new Error(`${label} names must be single letters`)
+    }
+    if (!Number.isFinite(value)) {
+      throw new Error(`${label} values must be finite numbers`)
+    }
+  }
 }
 
 export function greatestCommonDivisor(a: number, b: number): number {
@@ -322,39 +369,65 @@ function combinations(n: number, r: number): number {
 }
 
 export class CalculatorEngine {
-  private angleMode: AngleMode
-  private ans: number
-  private definitions: string[]
-  private variables: Record<string, number>
+  private angleMode: AngleMode = "degrees"
+  private ans = 0
+  private definitions: string[] = []
+  private variables: Record<string, number> = {}
   private readonly astCache = new Map<string, AstNode>()
 
   constructor(options: CalculatorEngineOptions = {}) {
-    this.angleMode = options.angleMode ?? "degrees"
-    this.ans = options.ans ?? 0
-    this.definitions = options.definitions ?? []
-    this.variables = options.variables ?? {}
+    this.setAngleMode(options.angleMode ?? "degrees")
+    this.setAns(options.ans ?? 0)
+    this.setDefinitions(options.definitions ?? [])
+    this.setVariables(options.variables ?? {})
   }
 
   setAngleMode(angleMode: AngleMode) {
+    if (angleMode !== "degrees" && angleMode !== "radians") {
+      throw new Error('Angle mode must be "degrees" or "radians"')
+    }
     this.angleMode = angleMode
   }
 
   setAns(ans: number) {
+    if (!Number.isFinite(ans)) throw new Error("Ans must be a finite number")
     this.ans = ans
   }
 
   setDefinitions(definitions: string[]) {
-    this.definitions = definitions
+    if (definitions.length > MAX_DEFINITIONS) {
+      throw new Error("Too many definitions")
+    }
+    for (const definition of definitions) {
+      if (String(definition).length > MAX_EXPRESSION_LENGTH) {
+        throw new Error("Definition is too long")
+      }
+    }
+    this.definitions = definitions.map(String)
     this.astCache.clear()
   }
 
   setVariables(variables: Record<string, number>) {
-    this.variables = variables
+    validateFiniteRecord(variables, "Variables")
+    this.variables = { ...variables }
   }
 
   evaluate(expression: string, locals: Record<string, number> = {}): CalculatorValue {
-    if (!expression.trim()) throw new Error("Enter an expression")
-    return this.evaluateNode(this.parseCached(expression), this.createScope(locals))
+    let source = String(expression)
+    if (!source.trim()) throw new Error("Enter an expression")
+    validateFiniteRecord(locals, "Local variables")
+    const hasXVariable =
+      Object.keys(locals).some((name) => name.toLowerCase() === "x") ||
+      Object.keys(this.variables).some((name) => name.toLowerCase() === "x") ||
+      this.definitions.some((definition) =>
+        /^x\s*=/.test(definition.trim().toLowerCase()),
+      )
+    if (!hasXVariable) source = source.replace(/\s+[xX]\s+/g, " * ")
+    const result = this.evaluateNode(
+      this.parseCached(source),
+      this.createScope(locals),
+    )
+    return this.ensureSupportedResult(result)
   }
 
   normalize(expression: string): string {
@@ -456,9 +529,21 @@ export class CalculatorEngine {
   }
 
   private tokenize(source: string): Token[] {
+    if (source.length > MAX_EXPRESSION_LENGTH) {
+      throw new Error("Expression is too long")
+    }
     const expression = this.normalize(source)
+    if (expression.length > MAX_EXPRESSION_LENGTH) {
+      throw new Error("Expression is too long")
+    }
     const tokens: Token[] = []
     let index = 0
+    const addToken = (token: Token) => {
+      if (tokens.length >= MAX_TOKENS) {
+        throw new Error("Expression is too complex")
+      }
+      tokens.push(token)
+    }
 
     while (index < expression.length) {
       const character = expression[index]
@@ -472,7 +557,7 @@ export class CalculatorEngine {
         }
         const number = Number(match[0])
         if (!Number.isFinite(number)) throw new Error("Invalid number")
-        tokens.push({ type: "number", value: number })
+        addToken({ type: "number", value: number })
         index += match[0].length
         continue
       }
@@ -483,38 +568,38 @@ export class CalculatorEngine {
           remaining.startsWith(name),
         )
         if (functionName) {
-          tokens.push({ type: "function", value: functionName })
+          addToken({ type: "function", value: functionName })
           index += functionName.length
           continue
         }
         if (remaining.startsWith("pi")) {
-          tokens.push({ type: "number", value: Math.PI })
+          addToken({ type: "number", value: Math.PI })
           index += 2
           continue
         }
         if (remaining.startsWith("ans")) {
-          tokens.push({ type: "variable", value: "ans" })
+          addToken({ type: "variable", value: "ans" })
           index += 3
           continue
         }
         if (remaining.startsWith("infinity")) {
-          tokens.push({ type: "number", value: Number.POSITIVE_INFINITY })
+          addToken({ type: "number", value: Number.POSITIVE_INFINITY })
           index += 8
           continue
         }
-        tokens.push({ type: "variable", value: character.toLowerCase() })
+        addToken({ type: "variable", value: character.toLowerCase() })
         index += 1
         continue
       }
 
       const twoCharacters = expression.slice(index, index + 2)
       if (["<=", ">=", "!="].includes(twoCharacters)) {
-        tokens.push({ type: twoCharacters as Token["type"] })
+        addToken({ type: twoCharacters as Token["type"] })
         index += 2
         continue
       }
       if ("+-*/^!%()[]{}|,:<>=".includes(character)) {
-        tokens.push({ type: character as Token["type"] })
+        addToken({ type: character as Token["type"] })
         index += 1
         continue
       }
@@ -730,8 +815,16 @@ export class CalculatorEngine {
 
   private parseCached(source: string): AstNode {
     const cached = this.astCache.get(source)
-    if (cached) return cached
+    if (cached) {
+      this.astCache.delete(source)
+      this.astCache.set(source, cached)
+      return cached
+    }
     const ast = this.parse(source)
+    if (this.astCache.size >= MAX_AST_CACHE_ENTRIES) {
+      const oldest = this.astCache.keys().next().value
+      if (oldest !== undefined) this.astCache.delete(oldest)
+    }
     this.astCache.set(source, ast)
     return ast
   }
@@ -863,8 +956,8 @@ export class CalculatorEngine {
                   : relation === ">="
                     ? a >= b
                     : relation === "!="
-                      ? Math.abs(a - b) > 1e-12
-                      : Math.abs(a - b) < 1e-12,
+                      ? !approximatelyEqual(a, b)
+                      : approximatelyEqual(a, b),
           left,
           right,
         )
@@ -878,7 +971,7 @@ export class CalculatorEngine {
             return this.evaluateNode(clause.value, scope)
           }
         }
-        return Number.NaN
+        throw new Error("No piecewise condition matched")
       }
       case "variableCall": {
         const definition = scope.functions[node.name!]
@@ -1023,9 +1116,23 @@ export class CalculatorEngine {
   }
 
   private flatten(values: CalculatorValue[]): number[] {
-    return values.flatMap((value) =>
-      Array.isArray(value) ? value : typeof value === "number" ? [value] : [],
-    )
+    return values.flatMap((value) => {
+      if (Array.isArray(value)) return value
+      if (typeof value === "number") return [value]
+      throw new Error("List functions need numeric values")
+    })
+  }
+
+  private ensureSupportedResult(value: CalculatorValue): CalculatorValue {
+    const numbers = Array.isArray(value) ? value : [value]
+    if (
+      numbers.some(
+        (item) => typeof item === "number" && !Number.isFinite(item),
+      )
+    ) {
+      throw new Error("Result is outside the supported numeric range")
+    }
+    return value
   }
 
   private evaluateListFunction(
@@ -1163,41 +1270,61 @@ export class CalculatorEngine {
 
     const inverseAngle = (radians: number) =>
       this.angleMode === "degrees" ? (radians * 180) / Math.PI : radians
+    const toRadians = (angle: number) =>
+      this.angleMode === "degrees" ? (angle % 360) * angleFactor : angle
+    const quarterTurns = (angle: number) =>
+      this.angleMode === "degrees"
+        ? angle / 90
+        : angle / (Math.PI / 2)
+    const exactQuarterTurn = (angle: number) => {
+      const turns = quarterTurns(angle)
+      return (
+        Number.isSafeInteger(turns) &&
+        (this.angleMode === "degrees" || Math.abs(turns) <= 1_000_000_000)
+      )
+    }
+    const quarterTurnIndex = (angle: number) =>
+      ((quarterTurns(angle) % 4) + 4) % 4
+    const cosineIsZero = (angle: number) =>
+      exactQuarterTurn(angle) &&
+      (quarterTurnIndex(angle) === 1 || quarterTurnIndex(angle) === 3)
+    const sineIsZero = (angle: number) =>
+      exactQuarterTurn(angle) &&
+      (quarterTurnIndex(angle) === 0 || quarterTurnIndex(angle) === 2)
 
     switch (functionName) {
       case "sin":
-        return cleanNumber(Math.sin(args[0] * angleFactor))
+        return Math.sin(toRadians(args[0]))
       case "cos":
-        return cleanNumber(Math.cos(args[0] * angleFactor))
+        return Math.cos(toRadians(args[0]))
       case "tan": {
-        const cosine = Math.cos(args[0] * angleFactor)
-        if (Math.abs(cosine) < 1e-14) {
+        if (cosineIsZero(args[0])) {
           throw new Error("Undefined: tangent is not defined here")
         }
-        return cleanNumber(Math.tan(args[0] * angleFactor))
+        const radians = toRadians(args[0])
+        return Math.tan(radians)
       }
       case "sec": {
-        const cosine = Math.cos(args[0] * angleFactor)
-        if (Math.abs(cosine) < 1e-14) {
+        if (cosineIsZero(args[0])) {
           throw new Error("Undefined: secant is not defined here")
         }
-        return cleanNumber(1 / cosine)
+        const cosine = Math.cos(toRadians(args[0]))
+        return 1 / cosine
       }
       case "csc": {
-        const sine = Math.sin(args[0] * angleFactor)
-        if (Math.abs(sine) < 1e-14) {
+        if (sineIsZero(args[0])) {
           throw new Error("Undefined: cosecant is not defined here")
         }
-        return cleanNumber(1 / sine)
+        const sine = Math.sin(toRadians(args[0]))
+        return 1 / sine
       }
       case "cot": {
-        const sine = Math.sin(args[0] * angleFactor)
-        if (Math.abs(sine) < 1e-14) {
+        if (sineIsZero(args[0])) {
           throw new Error("Undefined: cotangent is not defined here")
         }
-        return cleanNumber(
-          Math.cos(args[0] * angleFactor) / sine,
-        )
+        const radians = toRadians(args[0])
+        const sine = Math.sin(radians)
+        return Math.cos(radians) / sine
       }
       case "asin":
       case "arcsin":
@@ -1274,13 +1401,13 @@ export class CalculatorEngine {
       case "ceil":
         return Math.ceil(args[0])
       case "round":
-        if (args.length === 1) return Math.round(args[0])
+        if (args.length === 1) return roundDecimal(args[0], 0)
         if (!Number.isInteger(args[1]) || Math.abs(args[1]) > 100) {
           throw new Error(
             "round precision must be a whole number from −100 to 100",
           )
         }
-        return Math.round(args[0] * 10 ** args[1]) / 10 ** args[1]
+        return roundDecimal(args[0], args[1])
       case "sign":
         return Math.sign(args[0])
       case "gcd":

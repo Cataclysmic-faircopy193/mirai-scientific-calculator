@@ -17,7 +17,8 @@ interface while exposing a reusable, typed package for any React application.
 - Self-hosted Inter variable typography
 - Light, dark, and system theme support
 - Draggable, resizable, and fullscreen practice-player panel
-- 140+ automated tests covering math rules, edge cases, and UI interactions
+- 177 automated tests covering math rules, hostile edge cases, seeded
+  properties, package exports, and UI interactions
 
 ## Interface
 
@@ -211,6 +212,25 @@ const regression = fitRegression([1, 2, 3], [3, 5, 7], "linear")
 Public utilities also include graph-expression compilation, roots, extrema,
 intersections, correlation, covariance, ratios, coordinate calculations, and
 shape calculations. All public APIs ship with TypeScript declarations.
+
+## Numerical reliability
+
+The expression engine rejects undefined domains and non-finite results instead
+of displaying a misleading value. Decimal rounding uses consistent
+half-away-from-zero ties, degree-mode trigonometry reduces large angles before
+conversion, and equality checks use a scale-aware floating-point tolerance.
+
+Statistics use compensated summation, overflow-safe interpolation, scaled
+variance and correlation, and normalized QR least-squares regression. Graph
+searches reject discontinuities as roots and bound their sampling work.
+Expressions are limited to 4,096 source characters and 512 tokens, and parsed
+expressions use a bounded 256-entry cache.
+
+Like other JavaScript calculators, this package uses IEEE 754 double-precision
+numbers. Results are therefore limited to roughly 15–16 significant decimal
+digits and the finite range supported by JavaScript `number`. Operations whose
+real result exceeds that range return a clear error. Graph roots, extrema, and
+regression results are numerical approximations rather than symbolic proofs.
 
 ## Development
 

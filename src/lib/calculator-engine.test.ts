@@ -11,6 +11,7 @@ describe("CalculatorEngine", () => {
     const engine = new CalculatorEngine()
 
     expect(engine.evaluate("2 + 3 × 4")).toBe(14)
+    expect(engine.evaluate("6 x abs(6)")).toBe(36)
     expect(engine.evaluate("2(3+4)")).toBe(14)
     expect(engine.evaluate("√(81) + ∛(27)")).toBe(12)
     expect(engine.evaluate("−3^2")).toBe(-9)
@@ -73,6 +74,95 @@ describe("CalculatorEngine", () => {
         significantFigures: 4,
       }),
     ).toBe("1.2 × 10^3")
+  })
+
+  it("rounds decimal ties consistently away from zero", () => {
+    expect(evaluateExpression("round(1.005,2)")).toBe(1.01)
+    expect(evaluateExpression("round(2.675,2)")).toBe(2.68)
+    expect(evaluateExpression("round(−1.005,2)")).toBe(-1.01)
+    expect(evaluateExpression("round(−1.5)")).toBe(-2)
+  })
+
+  it("stays numerically stable for cancellation and extreme finite values", () => {
+    expect(
+      evaluateExpression("sum([10000000000000000,1,−10000000000000000])"),
+    ).toBe(1)
+    expect(evaluateExpression("mean([1e308,1e308])")).toBe(1e308)
+    expect(evaluateExpression("median([−1e308,1e308])")).toBe(0)
+    expect(evaluateExpression("quantile([−1e308,1e308],0.5)")).toBe(0)
+  })
+
+  it("reduces huge angles before evaluating trigonometric functions", () => {
+    const engine = new CalculatorEngine({ angleMode: "degrees" })
+
+    expect(engine.evaluate("sin(1e16)")).toBeCloseTo(
+      engine.evaluate("sin(280)") as number,
+      12,
+    )
+    expect(engine.evaluate("cos(−1e16)")).toBeCloseTo(
+      engine.evaluate("cos(−280)") as number,
+      12,
+    )
+  })
+
+  it("preserves tiny valid trigonometric values near singularities", () => {
+    const degrees = new CalculatorEngine({ angleMode: "degrees" })
+    const radians = new CalculatorEngine({ angleMode: "radians" })
+
+    expect(degrees.evaluate("sin(1e−14)")).toBeCloseTo(
+      (1e-14 * Math.PI) / 180,
+      28,
+    )
+    expect(degrees.evaluate("csc(1e−14)")).toBeCloseTo(
+      1 / Math.sin((1e-14 * Math.PI) / 180),
+      0,
+    )
+    expect(radians.evaluate("tan(π÷2+1e−12)")).toBeCloseTo(
+      Math.tan(Math.PI / 2 + 1e-12),
+      0,
+    )
+    expect(radians.evaluate("csc(1e−20)")).toBeCloseTo(1e20, -5)
+  })
+
+  it("uses scale-aware equality without treating tiny nonzero values as zero", () => {
+    expect(evaluateExpression("0.1+0.2=0.3")).toBe(true)
+    expect(evaluateExpression("0=1e−13")).toBe(false)
+    expect(evaluateExpression("1e12=1000000000000.01")).toBe(false)
+    expect(evaluateExpression("1e12≠1000000000000.01")).toBe(true)
+  })
+
+  it("rejects oversized and excessively complex expressions safely", () => {
+    expect(() => evaluateExpression(`${"1+".repeat(2050)}1`)).toThrow(
+      /too long/i,
+    )
+    expect(() => evaluateExpression(`${"1+".repeat(300)}1`)).toThrow(
+      /too complex/i,
+    )
+    expect(() =>
+      evaluateExpression(`${"(".repeat(300)}1${")".repeat(300)}`),
+    ).toThrow(/too complex/i)
+  })
+
+  it("bounds cached expressions and rejects unsafe runtime configuration", () => {
+    const engine = new CalculatorEngine()
+    for (let value = 1; value <= 300; value += 1) {
+      engine.evaluate(`${value}+1`)
+    }
+    const cache = (
+      engine as unknown as { astCache: Map<string, unknown> }
+    ).astCache
+
+    expect(cache.size).toBeLessThanOrEqual(256)
+    expect(() => engine.setAns(Number.NaN)).toThrow(/finite/i)
+    expect(() => engine.setVariables({ x: Number.POSITIVE_INFINITY })).toThrow(
+      /finite/i,
+    )
+    expect(
+      () =>
+        new CalculatorEngine({
+          definitions: Array.from({ length: 129 }, (_, index) => `a=${index}`),
+        }),
+    ).toThrow(/too many definitions/i)
   })
 
   it("exposes a one-shot evaluate helper", () => {
@@ -157,6 +247,7 @@ describe("CalculatorEngine", () => {
     const engine = new CalculatorEngine({ ans: 5 })
 
     expect(engine.evaluate("2π")).toBeCloseTo(2 * Math.PI)
+    expect(engine.evaluate("2 x + 1", { x: 3 })).toBe(7)
     expect(engine.evaluate("(2)(3)")).toBe(6)
     expect(engine.evaluate("3√(9)")).toBe(9)
     expect(engine.evaluate("2Ans")).toBe(10)
@@ -252,6 +343,10 @@ describe("CalculatorEngine", () => {
     ["stdev([1])", /at least two values/i],
     ["var([1])", /at least two values/i],
     ["mode([1,2,3])", /no mode/i],
+    ["mode([1,1,2,2])", /no mode/i],
+    ["sum([1],1<2)", /numeric values/i],
+    ["{1<0:2}", /no piecewise condition/i],
+    ["range([−1e308,1e308])", /numeric range/i],
     ["10^1000", /numeric range/i],
     ["exp(1000)", /numeric range/i],
     ["unknown", /unknown variable/i],

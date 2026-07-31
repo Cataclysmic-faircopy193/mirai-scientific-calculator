@@ -41,6 +41,23 @@ describe("calculator tools", () => {
     })
   })
 
+  it("simplifies tiny and extreme decimal ratios exactly", () => {
+    expect(calculateRatio(1e-13, 2e-13, 1)).toMatchObject({
+      simplifiedLeft: 1,
+      simplifiedRight: 2,
+      gcd: 1e-13,
+      lcm: 2e-13,
+    })
+    expect(
+      calculateRatio(Number.MIN_VALUE, 2 * Number.MIN_VALUE, 1),
+    ).toMatchObject({
+      simplifiedLeft: 1,
+      simplifiedRight: 2,
+      gcd: Number.MIN_VALUE,
+      lcm: 2 * Number.MIN_VALUE,
+    })
+  })
+
   it("calculates coordinate geometry", () => {
     const result = calculateCoordinates(-2, 1, 4, 9)
 
@@ -50,6 +67,23 @@ describe("calculator tools", () => {
     expect(result.intercept).toBeCloseTo(11 / 3)
   })
 
+  it("keeps extreme coordinate midpoints and slopes numerically stable", () => {
+    const identical = calculateCoordinates(1e308, 1e308, 1e308, 1e308)
+    const opposite = calculateCoordinates(
+      -1e308,
+      -1e308,
+      1e308,
+      1e308,
+    )
+
+    expect(identical.midpoint).toEqual([1e308, 1e308])
+    expect(identical.distance).toBe(0)
+    expect(identical.slope).toBeNull()
+    expect(opposite.midpoint).toEqual([0, 0])
+    expect(opposite.slope).toBe(1)
+    expect(opposite.distance).toBe(Number.POSITIVE_INFINITY)
+  })
+
   it("calculates common shape measures", () => {
     const result = calculateShapes(5, 12, 7, 4)
 
@@ -57,5 +91,16 @@ describe("calculator tools", () => {
     expect(result.circumference).toBeCloseTo(10 * Math.PI)
     expect(result.triangleArea).toBe(42)
     expect(result.prismVolume).toBe(336)
+  })
+
+  it("rejects non-finite helper inputs instead of returning misleading data", () => {
+    expect(() => calculatePercent(Number.NaN, 10)).toThrow(/finite/i)
+    expect(() => calculateRatio(1, Number.POSITIVE_INFINITY, 1)).toThrow(
+      /finite/i,
+    )
+    expect(() => calculateCoordinates(0, 0, Number.NaN, 1)).toThrow(/finite/i)
+    expect(() => calculateShapes(1, 2, 3, Number.NEGATIVE_INFINITY)).toThrow(
+      /finite/i,
+    )
   })
 })
