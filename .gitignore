@@ -1,9 +1,15 @@
 node_modules
 dist
 demo-dist
+site-dist
 coverage
+artifacts
+registry-dist
+release
+apps/web/src/components/mirai-calculator/*
+!apps/web/src/components/mirai-calculator/__tests__/
+!apps/web/src/components/mirai-calculator/__tests__/**
 .omx/
 .DS_Store
 *.local
 *.tgz
-coverage

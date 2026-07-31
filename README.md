@@ -2,32 +2,26 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/openmirai/mirai-scientific-calculator/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/openmirai/mirai-scientific-calculator/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/openmirai/mirai-scientific-calculator?style=flat-square)](https://github.com/openmirai/mirai-scientific-calculator/releases)
-[![npm](https://img.shields.io/npm/v/mirai-scientific-calculator?style=flat-square&color=2A9D90)](https://www.npmjs.com/package/mirai-scientific-calculator)
-[![npm downloads](https://img.shields.io/npm/dm/mirai-scientific-calculator?style=flat-square&color=2A9D90)](https://www.npmjs.com/package/mirai-scientific-calculator)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2A9D90?style=flat-square)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-ready-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 
-A production-ready React calculator for scientific computation, graphing,
-statistics, and common math tools. It preserves the OpenMirai practice-player
-interface while exposing a reusable, typed package for any React application.
+A scientific, graphing, statistics, and math tools calculator with two
+distribution channels:
 
-- Vite, React, and TypeScript
-- Tailwind CSS v4 with shadcn/ui source components
-- ESM and CommonJS package outputs
-- Self-hosted Inter variable typography
-- Light, dark, and system theme support
-- Draggable, resizable, and fullscreen practice-player panel
-- 180 automated tests covering math rules, hostile edge cases, seeded
-  properties, package exports, and UI interactions
+- **Editable React UI:** the `@openmirai/calculator` shadcn registry item
+- **Headless APIs:** the dependency-free `@openmirai/calculator-core` npm package
+
+The UI preserves the OpenMirai practice-player interface. The core package
+provides the same calculation engines without React, styles, or UI dependencies.
 
 ## Interface
 
-| Scientific calculator | Graphing calculator |
-|:---:|:---:|
+|                                                          Scientific calculator                                                          |                                                         Graphing calculator                                                         |
+| :-------------------------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------------------: |
 | ![Scientific calculator](https://raw.githubusercontent.com/openmirai/mirai-scientific-calculator/main/docs/images/scientific-light.png) | ![Graphing calculator](https://raw.githubusercontent.com/openmirai/mirai-scientific-calculator/main/docs/images/graphing-light.png) |
 
-| Statistics in dark mode | Math tools |
-|:---:|:---:|
+|                                                               Statistics in dark mode                                                               |                                                       Math tools                                                        |
+| :-------------------------------------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------: |
 | ![Statistics calculator in dark mode](https://raw.githubusercontent.com/openmirai/mirai-scientific-calculator/main/docs/images/statistics-dark.png) | ![Math tools](https://raw.githubusercontent.com/openmirai/mirai-scientific-calculator/main/docs/images/tools-light.png) |
 
 ## Features
@@ -62,33 +56,36 @@ interface while exposing a reusable, typed package for any React application.
 - Coordinate distance, midpoint, slope, and line equations
 - Circle, triangle, and rectangular-prism measures
 
-## Installation
+## Install the editable UI
 
-Install the package from the public npm registry:
-
-```bash
-pnpm add mirai-scientific-calculator
-```
-
-Alternatively, install the tarball from the latest GitHub Release:
+Run the shadcn CLI in an existing shadcn project:
 
 ```bash
-pnpm add https://github.com/openmirai/mirai-scientific-calculator/releases/latest/download/mirai-scientific-calculator.tgz
+pnpm dlx shadcn@latest add @openmirai/calculator
 ```
 
-Both installation methods are public and require no registry authentication.
-React and React DOM are peer dependencies; React 18.2 or newer is supported.
+The registry item copies the calculator into
+`components/mirai-calculator`, installs its shadcn primitives, and automatically
+installs `@openmirai/calculator-core`. The copied component owns its styles, so
+there is no separate UI package or stylesheet package to install.
 
-## Quick start
+The OpenMirai wordmark is embedded directly in the calculator header and is
+always rendered, including when `extensions={[]}`. The supported component API
+does not expose a branding toggle or external logo asset.
 
-Import the component and its compiled stylesheet:
+The registry supports projects initialized with Base UI or Radix without
+replacing unrelated components or global theme variables.
+
+## Use the UI
+
+Import the installed component from your application:
 
 ```tsx
 import {
+  CalculatorExtension,
   MiraiCalculator,
   type CalculatorMode,
-} from "mirai-scientific-calculator"
-import "mirai-scientific-calculator/styles.css"
+} from "@/components/mirai-calculator/mirai-calculator"
 
 export function CalculatorPage() {
   const handleModeChange = (mode: CalculatorMode) => {
@@ -97,8 +94,9 @@ export function CalculatorPage() {
 
   return (
     <MiraiCalculator
+      extensions={[CalculatorExtension.SCIENTIFIC, CalculatorExtension.GRAPHING]}
       height={660}
-      defaultMode="scientific"
+      defaultMode={CalculatorExtension.SCIENTIFIC}
       defaultTheme="system"
       onModeChange={handleModeChange}
     />
@@ -106,50 +104,39 @@ export function CalculatorPage() {
 }
 ```
 
-No Tailwind configuration is required in the consuming application. The
-package ships its generated CSS as a separate export.
-
-## Practice-player panel
+### Practice-player panel
 
 Enable the OpenMirai backdrop and floating panel with `showBackdrop`. The
 header becomes draggable, the bottom-right corner resizes the calculator, and
 double-clicking the header toggles fullscreen.
 
 ```tsx
-import { MiraiCalculator } from "mirai-scientific-calculator"
-import "mirai-scientific-calculator/styles.css"
+import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 
 export function PracticePlayer() {
-  return (
-    <MiraiCalculator
-      showBackdrop
-      title="OpenMirai Calculator"
-      defaultTheme="light"
-    />
-  )
+  return <MiraiCalculator showBackdrop title="OpenMirai Calculator" defaultTheme="light" />
 }
 ```
 
 The floating panel starts at `1040 × 660` pixels and respects a `720 × 460`
 minimum while remaining bounded by the backdrop.
 
-## Controlled state
+### Controlled state
 
-Mode, angle mode, theme, and visibility can each be controlled or uncontrolled.
+Mode, angle mode, and theme can each be controlled or uncontrolled.
 
 ```tsx
 import { useState } from "react"
 import {
+  CalculatorExtension,
   MiraiCalculator,
   type CalculatorMode,
   type CalculatorTheme,
-} from "mirai-scientific-calculator"
-import "mirai-scientific-calculator/styles.css"
+} from "@/components/mirai-calculator/mirai-calculator"
 
 export function ControlledCalculator() {
-  const [mode, setMode] = useState<CalculatorMode>("graphing")
+  const [mode, setMode] = useState<CalculatorMode>(CalculatorExtension.GRAPHING)
   const [theme, setTheme] = useState<CalculatorTheme>("dark")
-  const [hidden, setHidden] = useState(false)
 
   return (
     <MiraiCalculator
@@ -158,45 +145,54 @@ export function ControlledCalculator() {
       theme={theme}
       onThemeChange={setTheme}
       angleMode="degrees"
-      hidden={hidden}
-      onHiddenChange={setHidden}
     />
   )
 }
 ```
 
-## Component API
+### Component API
 
-| Prop | Type | Default | Description |
-|---|---|---:|---|
-| `className` | `string` | — | Additional class names for the calculator panel |
-| `style` | `CSSProperties` | — | Inline styles for the calculator panel |
-| `height` | `number \| string` | `660` | Standalone panel height |
-| `mode` | `CalculatorMode` | — | Controlled calculator mode |
-| `defaultMode` | `CalculatorMode` | `"scientific"` | Initial uncontrolled mode |
-| `onModeChange` | `(mode) => void` | — | Called after the mode changes |
-| `angleMode` | `"degrees" \| "radians"` | — | Controlled angle mode |
-| `defaultAngleMode` | `"degrees" \| "radians"` | `"degrees"` | Initial uncontrolled angle mode |
-| `onAngleModeChange` | `(mode) => void` | — | Called after the angle mode changes |
-| `theme` | `"light" \| "dark" \| "system"` | — | Controlled color theme |
-| `defaultTheme` | `"light" \| "dark" \| "system"` | `"light"` | Initial uncontrolled theme |
-| `onThemeChange` | `(theme) => void` | — | Called after the theme changes |
-| `hidden` | `boolean` | — | Controlled hidden state |
-| `defaultHidden` | `boolean` | `false` | Initial uncontrolled hidden state |
-| `onHiddenChange` | `(hidden) => void` | — | Called when the calculator is hidden or restored |
-| `startFullscreen` | `boolean` | `false` | Opens the panel in fullscreen mode |
-| `showBackdrop` | `boolean` | `false` | Enables the practice backdrop and panel drag/resize |
-| `title` | `string` | `"Calculator"` | Accessible panel title |
-| `onClose` | `() => void` | — | Adds a close button and handles its action |
+| Prop                | Type                             |        Default | Description                                         |
+| ------------------- | -------------------------------- | -------------: | --------------------------------------------------- |
+| `className`         | `string`                         |              — | Additional class names for the calculator panel     |
+| `style`             | `CSSProperties`                  |              — | Inline styles for the calculator panel              |
+| `height`            | `number \| string`               |          `660` | Standalone panel height                             |
+| `extensions`        | `readonly CalculatorExtension[]` |      all modes | Enabled modes in their navigation order             |
+| `mode`              | `CalculatorMode`                 |              — | Controlled calculator mode                          |
+| `defaultMode`       | `CalculatorMode`                 | `"scientific"` | Initial uncontrolled mode                           |
+| `onModeChange`      | `(mode) => void`                 |              — | Called after the mode changes                       |
+| `angleMode`         | `"degrees" \| "radians"`         |              — | Controlled angle mode                               |
+| `defaultAngleMode`  | `"degrees" \| "radians"`         |    `"degrees"` | Initial uncontrolled angle mode                     |
+| `onAngleModeChange` | `(mode) => void`                 |              — | Called after the angle mode changes                 |
+| `theme`             | `"light" \| "dark" \| "system"`  |              — | Controlled color theme                              |
+| `defaultTheme`      | `"light" \| "dark" \| "system"`  |      `"light"` | Initial uncontrolled theme                          |
+| `onThemeChange`     | `(theme) => void`                |              — | Called after the theme changes                      |
+| `startFullscreen`   | `boolean`                        |        `false` | Opens the panel in fullscreen mode                  |
+| `showBackdrop`      | `boolean`                        |        `false` | Enables the practice backdrop and panel drag/resize |
+| `title`             | `string`                         | `"Calculator"` | Accessible panel title                              |
+| `onClose`           | `() => void`                     |              — | Adds a close button and handles its action          |
 
 ```ts
-type CalculatorMode = "scientific" | "graphing" | "statistics" | "tools"
+const CalculatorExtension = {
+  SCIENTIFIC: "scientific",
+  GRAPHING: "graphing",
+  STATISTICS: "statistics",
+  TOOLS: "tools",
+} as const
+
+type CalculatorMode = (typeof CalculatorExtension)[keyof typeof CalculatorExtension]
 type CalculatorTheme = "light" | "dark" | "system"
 ```
 
-## Calculation APIs
+## Use the headless APIs
 
-The calculation modules are exported independently for use without the UI:
+Install version `0.2.0` of the dependency-free core package:
+
+```bash
+pnpm add @openmirai/calculator-core@0.2.0
+```
+
+Import from the root export when several calculator domains are needed:
 
 ```ts
 import {
@@ -204,7 +200,7 @@ import {
   calculateStatistics,
   evaluateExpression,
   fitRegression,
-} from "mirai-scientific-calculator"
+} from "@openmirai/calculator-core"
 
 const value = evaluateExpression("sin(30) + sqrt(81)", {
   angleMode: "degrees",
@@ -215,70 +211,79 @@ const percent = calculatePercent(15, 240)
 const regression = fitRegression([1, 2, 3], [3, 5, 7], "linear")
 ```
 
-Public utilities also include graph-expression compilation, roots, extrema,
-intersections, correlation, covariance, ratios, coordinate calculations, and
-shape calculations. All public APIs ship with TypeScript declarations.
+The package provides focused exports for narrower imports:
 
-## Numerical reliability
+| Export                                  | APIs                                                        |
+| --------------------------------------- | ----------------------------------------------------------- |
+| `@openmirai/calculator-core`            | All public headless APIs                                    |
+| `@openmirai/calculator-core/engine`     | Expression evaluation, formatting, and calculator engine    |
+| `@openmirai/calculator-core/graphing`   | Expression compilation, roots, extrema, and intersections   |
+| `@openmirai/calculator-core/statistics` | Descriptive statistics, correlation, covariance, regression |
+| `@openmirai/calculator-core/tools`      | Percent, ratio, coordinate, and shape calculations          |
 
-The expression engine rejects undefined domains and non-finite results instead
-of displaying a misleading value. Decimal rounding uses consistent
-half-away-from-zero ties, degree-mode trigonometry reduces large angles before
-conversion, and equality checks use a scale-aware floating-point tolerance.
-
-Statistics use compensated summation, overflow-safe interpolation, scaled
-variance and correlation, and normalized QR least-squares regression. Graph
-searches reject discontinuities as roots and bound their sampling work.
-Expressions are limited to 4,096 source characters and 512 tokens, and parsed
-expressions use a bounded 256-entry cache.
-
-Like other JavaScript calculators, this package uses IEEE 754 double-precision
-numbers. Results are therefore limited to roughly 15–16 significant decimal
-digits and the finite range supported by JavaScript `number`. Operations whose
-real result exceeds that range return a clear error. Graph roots, extrema, and
-regression results are numerical approximations rather than symbolic proofs.
+All exports include TypeScript declarations.
 
 ## Development
+
+Use Node 24. The included `.nvmrc` follows the current LTS line:
+
+```bash
+nvm use
+```
+
+Install dependencies and start the demo:
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Quality checks:
+The repository is split into focused workspaces:
+
+- `packages/calculator-core` — the publishable dependency-free library
+- `packages/calculator-registry` — the canonical shadcn calculator source
+- `apps/web` — the TanStack Router showcase and registry consumer
+
+`pnpm app:install` builds the core, builds the registry item, and installs the
+calculator into the web app with the shadcn CLI. The installed copy is generated
+and is not maintained separately.
+
+Run the repository checks:
 
 ```bash
+pnpm format:check
 pnpm lint
-pnpm test
+pnpm typecheck
+pnpm test:coverage
 pnpm build
 pnpm publint
+pnpm registry:build
+pnpm build:site
+pnpm smoke:site
+pnpm smoke:registry
 ```
 
-`pnpm build` produces:
+## Continuous integration and release
 
-- `dist/index.js` — ESM
-- `dist/index.cjs` — CommonJS
-- `dist/index.d.ts` and `dist/index.d.cts` — TypeScript declarations
-- `dist/styles.css` — compiled component styles
+CI runs formatting, type-aware linting, TypeScript checks, tests and coverage,
+the dependency-free core build, package-export validation, registry validation,
+and Base UI and Radix registry consumer smoke tests.
 
-## Continuous integration and publishing
+The release workflow is designed to publish the committed
+`@openmirai/calculator-core` version, create the matching Git tag, and create a
+GitHub Release. The React UI is distributed only through the shadcn registry;
+it is not published as an npm package or bundled as a package release asset.
 
-The CI workflow runs linting, all tests, the production package build,
-`publint`, and an installable tarball build for every push and pull request.
+### Release status
 
-Releases are tag-driven. After updating the version in `package.json`, push a
-matching version tag:
+Normal checks and merges do not publish `@openmirai/calculator-core` or
+deprecate any package. Publishing requires a manual Release workflow dispatch,
+and any deprecation remains a separate future manual action.
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-The Release workflow verifies the version, runs all checks, publishes
-`mirai-scientific-calculator` to npm with provenance, builds and uploads the
-package tarball, and creates a GitHub Release with generated notes. Publishing
-uses the repository's `NPM_TOKEN` secret. Existing package versions are
-detected and are not republished.
+The `@openmirai/calculator` command is the intended sole UI installation
+surface. It becomes resolvable after the hosted registry is live and the
+namespace is accepted into the shadcn registry directory; no fallback install
+command is required or documented here.
 
 ## License
 

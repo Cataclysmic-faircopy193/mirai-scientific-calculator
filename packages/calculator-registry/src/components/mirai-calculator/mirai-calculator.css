@@ -1,0 +1,224 @@
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+.mirai-calculator,
+.mirai-calculator-portal {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.008 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.008 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.008 250);
+  --primary: #2a9d90;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #27272a;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f0faf9;
+  --accent-foreground: #1a6f68;
+  --destructive: #ef4444;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #2a9d90;
+  --chart-1: #2a9d90;
+  --chart-2: oklch(0.62 0.16 250);
+  --chart-3: oklch(0.73 0.16 75);
+  --chart-4: oklch(0.63 0.18 310);
+  --chart-5: oklch(0.62 0.2 28);
+  --mirai-radius: var(--radius);
+  --mirai-background: var(--background);
+  --mirai-foreground: var(--foreground);
+  --mirai-card: var(--card);
+  --mirai-card-foreground: var(--card-foreground);
+  --mirai-popover: var(--popover);
+  --mirai-popover-foreground: var(--popover-foreground);
+  --mirai-primary: var(--primary);
+  --mirai-primary-foreground: var(--primary-foreground);
+  --mirai-secondary: var(--secondary);
+  --mirai-secondary-foreground: var(--secondary-foreground);
+  --mirai-muted: var(--muted);
+  --mirai-muted-foreground: var(--muted-foreground);
+  --mirai-accent: var(--accent);
+  --mirai-accent-foreground: var(--accent-foreground);
+  --mirai-destructive: var(--destructive);
+  --mirai-border: var(--border);
+  --mirai-input: var(--input);
+  --mirai-ring: var(--ring);
+  --mirai-chart-1: var(--chart-1);
+  --mirai-chart-2: var(--chart-2);
+  --mirai-chart-3: var(--chart-3);
+  --mirai-chart-4: var(--chart-4);
+  --mirai-chart-5: var(--chart-5);
+}
+
+.mirai-calculator {
+  container-name: mirai-calculator;
+  container-type: inline-size;
+  color-scheme: light;
+  font-family: "Inter Variable", Inter, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirai-mode-switcher {
+  position: relative;
+  flex: 0 1 364px;
+  width: 364px;
+  max-width: 100%;
+}
+
+.mirai-keypad-tabs-list {
+  height: 40px !important;
+  overflow: hidden;
+}
+
+.mirai-keypad-tab {
+  flex: none;
+  height: 40px;
+  border-radius: 0;
+  padding-inline: 12px;
+  color: var(--mirai-muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.mirai-keypad-tab,
+.mirai-keypad-tab[data-active],
+.mirai-keypad-tab[data-state="active"] {
+  background: transparent !important;
+}
+
+.mirai-keypad-tab::after {
+  right: 0;
+  bottom: -1px !important;
+  left: 0;
+  height: 2px !important;
+  background: var(--mirai-primary) !important;
+}
+
+.mirai-keypad-tab[data-active],
+.mirai-keypad-tab[data-state="active"] {
+  color: var(--mirai-primary);
+}
+
+.mirai-scientific-layout {
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.85fr);
+}
+
+.mirai-scientific-primary,
+.mirai-graphing-sidebar,
+.mirai-statistics-sidebar {
+  border-right: 1px solid var(--mirai-border);
+}
+
+.mirai-graphing-layout,
+.mirai-statistics-layout {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
+.mirai-tools-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+}
+
+.mirai-tools-wide {
+  grid-column: 1 / -1;
+}
+
+@container mirai-calculator (max-width: 699px) {
+  .mirai-mode-switcher {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .mirai-scientific-layout,
+  .mirai-graphing-layout,
+  .mirai-statistics-layout {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  .mirai-scientific-primary,
+  .mirai-graphing-sidebar,
+  .mirai-statistics-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--mirai-border);
+  }
+
+  .mirai-scientific-primary {
+    min-height: 420px;
+  }
+
+  .mirai-scientific-secondary {
+    min-height: 300px;
+  }
+
+  .mirai-graphing-sidebar {
+    order: 2;
+    min-height: 300px;
+    max-height: 50%;
+  }
+
+  .mirai-graphing-canvas {
+    order: 1;
+    min-height: 320px;
+  }
+
+  .mirai-statistics-sidebar {
+    min-height: 420px;
+  }
+
+  .mirai-statistics-results {
+    min-height: 520px;
+  }
+}
+
+.mirai-calculator.dark,
+.mirai-calculator-portal.dark {
+  --background: oklch(0.16 0.01 250);
+  --foreground: oklch(0.965 0.004 250);
+  --card: oklch(0.205 0.012 250);
+  --card-foreground: oklch(0.965 0.004 250);
+  --popover: oklch(0.205 0.012 250);
+  --popover-foreground: oklch(0.965 0.004 250);
+  --primary: oklch(0.72 0.12 181);
+  --primary-foreground: oklch(0.16 0.03 181);
+  --secondary: oklch(0.27 0.012 250);
+  --secondary-foreground: oklch(0.965 0.004 250);
+  --muted: oklch(0.25 0.012 250);
+  --muted-foreground: oklch(0.7 0.015 250);
+  --accent: oklch(0.28 0.045 181);
+  --accent-foreground: oklch(0.9 0.055 181);
+  --destructive: oklch(0.7 0.19 24);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.72 0.12 181);
+  --chart-1: oklch(0.72 0.12 181);
+  --chart-2: oklch(0.7 0.16 250);
+  --chart-3: oklch(0.78 0.16 75);
+  --chart-4: oklch(0.72 0.17 310);
+  --chart-5: oklch(0.7 0.18 28);
+}
+
+.mirai-calculator.dark,
+.mirai-calculator-portal.dark {
+  color-scheme: dark;
+}
+
+.mirai-calculator canvas {
+  display: block;
+}
+
+.mirai-calculator input[type="range"] {
+  accent-color: #2a9d90;
+}

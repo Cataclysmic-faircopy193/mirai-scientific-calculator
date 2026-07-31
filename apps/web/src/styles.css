@@ -1,0 +1,126 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0.004 247);
+  --foreground: oklch(0.178 0.035 259);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.178 0.035 259);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.178 0.035 259);
+  --primary: oklch(0.18 0.045 260);
+  --primary-foreground: oklch(0.985 0.004 247);
+  --secondary: oklch(0.946 0.012 248);
+  --secondary-foreground: oklch(0.24 0.038 258);
+  --muted: oklch(0.956 0.009 247);
+  --muted-foreground: oklch(0.515 0.035 257);
+  --accent: oklch(0.941 0.019 207);
+  --accent-foreground: oklch(0.23 0.052 238);
+  --destructive: oklch(0.61 0.22 27);
+  --border: oklch(0.89 0.015 251);
+  --input: oklch(0.89 0.015 251);
+  --ring: oklch(0.64 0.115 210);
+  --chart-1: oklch(0.65 0.15 213);
+  --chart-2: oklch(0.59 0.13 248);
+  --chart-3: oklch(0.47 0.11 265);
+  --chart-4: oklch(0.76 0.13 183);
+  --chart-5: oklch(0.7 0.12 145);
+}
+
+.dark {
+  --background: oklch(0.13 0.034 260);
+  --foreground: oklch(0.965 0.008 247);
+  --card: oklch(0.17 0.039 260);
+  --card-foreground: oklch(0.965 0.008 247);
+  --popover: oklch(0.17 0.039 260);
+  --popover-foreground: oklch(0.965 0.008 247);
+  --primary: oklch(0.83 0.13 206);
+  --primary-foreground: oklch(0.15 0.04 256);
+  --secondary: oklch(0.225 0.042 258);
+  --secondary-foreground: oklch(0.95 0.01 247);
+  --muted: oklch(0.215 0.035 258);
+  --muted-foreground: oklch(0.7 0.03 252);
+  --accent: oklch(0.26 0.052 240);
+  --accent-foreground: oklch(0.94 0.018 210);
+  --destructive: oklch(0.7 0.19 25);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.71 0.12 208);
+  --chart-1: oklch(0.72 0.14 210);
+  --chart-2: oklch(0.67 0.14 250);
+  --chart-3: oklch(0.75 0.12 175);
+  --chart-4: oklch(0.72 0.14 300);
+  --chart-5: oklch(0.75 0.15 80);
+}
+
+@theme inline {
+  --font-heading: "IBM Plex Sans Variable", sans-serif;
+  --font-sans: "IBM Plex Sans Variable", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --color-chart-5: var(--mirai-chart-5, var(--chart-5));
+  --color-chart-4: var(--mirai-chart-4, var(--chart-4));
+  --color-chart-3: var(--mirai-chart-3, var(--chart-3));
+  --color-chart-2: var(--mirai-chart-2, var(--chart-2));
+  --color-chart-1: var(--mirai-chart-1, var(--chart-1));
+  --color-ring: var(--mirai-ring, var(--ring));
+  --color-input: var(--mirai-input, var(--input));
+  --color-border: var(--mirai-border, var(--border));
+  --color-destructive: var(--mirai-destructive, var(--destructive));
+  --color-accent-foreground: var(--mirai-accent-foreground, var(--accent-foreground));
+  --color-accent: var(--mirai-accent, var(--accent));
+  --color-muted-foreground: var(--mirai-muted-foreground, var(--muted-foreground));
+  --color-muted: var(--mirai-muted, var(--muted));
+  --color-secondary-foreground: var(--mirai-secondary-foreground, var(--secondary-foreground));
+  --color-secondary: var(--mirai-secondary, var(--secondary));
+  --color-primary-foreground: var(--mirai-primary-foreground, var(--primary-foreground));
+  --color-primary: var(--mirai-primary, var(--primary));
+  --color-popover-foreground: var(--mirai-popover-foreground, var(--popover-foreground));
+  --color-popover: var(--mirai-popover, var(--popover));
+  --color-card-foreground: var(--mirai-card-foreground, var(--card-foreground));
+  --color-card: var(--mirai-card, var(--card));
+  --color-foreground: var(--mirai-foreground, var(--foreground));
+  --color-background: var(--mirai-background, var(--background));
+  --radius-sm: calc(var(--mirai-radius, var(--radius)) - 4px);
+  --radius-md: calc(var(--mirai-radius, var(--radius)) - 2px);
+  --radius-lg: var(--mirai-radius, var(--radius));
+  --radius-xl: calc(var(--mirai-radius, var(--radius)) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-w-80 bg-background font-sans text-foreground antialiased;
+    min-height: 100dvh;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--ring) 35%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

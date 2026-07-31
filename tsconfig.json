@@ -2,10 +2,13 @@
   "files": [],
   "references": [
     {
-      "path": "./tsconfig.app.json"
+      "path": "./packages/calculator-core"
     },
     {
-      "path": "./tsconfig.node.json"
+      "path": "./packages/calculator-registry"
+    },
+    {
+      "path": "./apps/web"
     }
   ]
 }

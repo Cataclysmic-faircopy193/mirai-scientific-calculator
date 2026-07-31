@@ -1,0 +1,14 @@
+{
+  "extends": "@tsconfig/vite-react/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "types": ["react"],
+    "paths": {
+      "@/components/mirai-calculator/*": ["./src/components/mirai-calculator/*"],
+      "@/components/ui/*": ["../../apps/web/src/components/ui/*"],
+      "@/lib/utils": ["../../apps/web/src/lib/utils.ts"]
+    }
+  },
+  "include": ["src"]
+}

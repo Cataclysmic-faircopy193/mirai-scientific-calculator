@@ -1,0 +1,47 @@
+import type { ReactNode } from "react"
+import { Code2, Eye } from "lucide-react"
+
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CopyButton } from "@/site/copy-button"
+
+const PREVIEW_TAB = "preview"
+const CODE_TAB = "code"
+
+export function CodePreview({
+  preview,
+  code,
+  previewLabel,
+}: {
+  preview: ReactNode
+  code: string
+  previewLabel: string
+}) {
+  return (
+    <Tabs defaultValue={PREVIEW_TAB} className="gap-0">
+      <Card className="gap-0 overflow-hidden py-0">
+        <CardHeader className="flex min-h-12 flex-row items-center justify-between border-b bg-muted/30 px-3 py-2">
+          <TabsList>
+            <TabsTrigger value={PREVIEW_TAB}>
+              <Eye /> Preview
+            </TabsTrigger>
+            <TabsTrigger value={CODE_TAB}>
+              <Code2 /> Code
+            </TabsTrigger>
+          </TabsList>
+          <CopyButton value={code} label="Copy code" />
+        </CardHeader>
+        <CardContent className="p-0">
+          <TabsContent value={PREVIEW_TAB} aria-label={`${previewLabel} preview`}>
+            <div className="bg-muted/20 p-3 sm:p-6">{preview}</div>
+          </TabsContent>
+          <TabsContent value={CODE_TAB} aria-label={`${previewLabel} code`}>
+            <pre className="max-h-[640px] overflow-auto bg-slate-950 p-5 text-sm leading-7 text-slate-100">
+              <code>{code}</code>
+            </pre>
+          </TabsContent>
+        </CardContent>
+      </Card>
+    </Tabs>
+  )
+}

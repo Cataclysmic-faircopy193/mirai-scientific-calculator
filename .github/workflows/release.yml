@@ -1,15 +1,7 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing version tag to release, for example v0.1.0
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -17,16 +9,19 @@ permissions:
 
 jobs:
   release:
-    name: Verify, publish, and release
+    name: Publish committed core version
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HUSKY: "0"
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
-      - name: Check out repository
+      - name: Check out main with tags
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          ref: main
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -36,72 +31,17 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24.18.0
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify tag matches package version
+      - name: Configure release tag identity
         run: |
-          package_version="$(node -p "require('./package.json').version")"
-          if [ "$RELEASE_TAG" != "v$package_version" ]; then
-            echo "Tag $RELEASE_TAG does not match package version $package_version"
-            exit 1
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Verify package
-        run: pnpm check
-
-      - name: Audit package exports
-        run: pnpm publint
-
-      - name: Check published version
-        id: package
-        run: |
-          package_version="$(node -p "require('./package.json').version")"
-          if pnpm view "mirai-scientific-calculator@$package_version" version \
-            --registry=https://registry.npmjs.org >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish package
-        if: steps.package.outputs.exists != 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::error::Add an npm access token as the NPM_TOKEN repository secret."
-            exit 1
-          fi
-          pnpm publish --access public --no-git-checks --provenance
-
-      - name: Build release tarball
-        run: |
-          mkdir -p release
-          pnpm pack --pack-destination release
-          cp release/mirai-scientific-calculator-*.tgz \
-            release/mirai-scientific-calculator.tgz
-
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.RELEASE_TAG }}-package
-          path: release/*.tgz
-          if-no-files-found: error
-
-      - name: Create GitHub Release
-        run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release/*.tgz --clobber
-          else
-            gh release create "$RELEASE_TAG" release/*.tgz \
-              --verify-tag \
-              --generate-notes \
-              --title "$RELEASE_TAG"
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Release existing package version
+        run: pnpm exec release-it --ci --no-increment

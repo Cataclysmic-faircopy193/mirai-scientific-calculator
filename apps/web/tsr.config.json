@@ -1,0 +1,7 @@
+{
+  "routesDirectory": "./src/routes",
+  "generatedRouteTree": "./src/route-tree.gen.ts",
+  "routeFileIgnorePattern": "__tests__",
+  "quoteStyle": "double",
+  "semicolons": false
+}

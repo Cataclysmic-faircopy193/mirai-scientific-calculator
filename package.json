@@ -1,118 +1,53 @@
 {
-  "name": "mirai-scientific-calculator",
-  "version": "0.1.6",
-  "description": "A reusable scientific, graphing, statistics, and math tools calculator for React.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/openmirai/mirai-scientific-calculator.git"
-  },
-  "homepage": "https://github.com/openmirai/mirai-scientific-calculator#readme",
-  "bugs": {
-    "url": "https://github.com/openmirai/mirai-scientific-calculator/issues"
-  },
+  "name": "@openmirai/calculator-workspace",
+  "version": "0.2.0",
+  "private": true,
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "style": "./dist/styles.css",
-  "unpkg": "./dist/index.js",
-  "exports": {
-    ".": {
-      "style": "./dist/styles.css",
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    },
-    "./styles.css": "./dist/styles.css",
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "sideEffects": [
-    "**/*.css"
-  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build && node scripts/copy-cjs-types.mjs",
-    "build:demo": "vite build --mode demo --outDir demo-dist",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "lint": "eslint .",
-    "publint": "publint",
-    "typecheck": "tsc -b --pretty false",
-    "check": "pnpm lint && pnpm test && pnpm build",
-    "prepack": "pnpm check"
-  },
-  "peerDependencies": {
-    "react": ">=18.2.0",
-    "react-dom": ">=18.2.0"
+    "dev": "pnpm --filter @openmirai/calculator-web dev",
+    "build": "pnpm --filter @openmirai/calculator-core build",
+    "app:install": "pnpm build && pnpm registry:build && node scripts/install-registry-app.mjs && pnpm --filter @openmirai/calculator-web routes:generate",
+    "build:site": "pnpm app:install && pnpm --filter @openmirai/calculator-web build && node scripts/prepare-site.mjs",
+    "smoke:site": "node scripts/smoke-site.mjs",
+    "deploy:site": "pnpm build:site && wrangler deploy",
+    "deploy:site:dry-run": "wrangler deploy --dry-run",
+    "test": "pnpm app:install && pnpm --filter @openmirai/calculator-core test && pnpm --filter @openmirai/calculator-web test",
+    "test:coverage": "pnpm app:install && pnpm --filter @openmirai/calculator-core test:coverage && pnpm --filter @openmirai/calculator-web test:coverage",
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "lint:fix": "oxlint --type-aware --fix .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "typecheck": "pnpm app:install && pnpm --filter @openmirai/calculator-core typecheck && pnpm --filter @openmirai/calculator-registry-source typecheck && pnpm --filter @openmirai/calculator-web typecheck",
+    "publint": "pnpm --filter @openmirai/calculator-core publint",
+    "registry:validate": "node scripts/validate-registry.mjs",
+    "registry:build": "pnpm registry:validate && shadcn build \"$PWD/registry.json\" --cwd apps/web --output \"$PWD/registry-dist\"",
+    "smoke:registry:base": "node scripts/smoke-registry.mjs base",
+    "smoke:registry:radix": "node scripts/smoke-registry.mjs radix",
+    "smoke:registry": "pnpm smoke:registry:base && pnpm smoke:registry:radix",
+    "smoke:package": "node scripts/smoke-package.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm publint && pnpm registry:build",
+    "release:check": "pnpm check && pnpm smoke:registry && pnpm smoke:package",
+    "release:assets": "node scripts/prepare-release-assets.mjs",
+    "release:verify-published": "node scripts/verify-published.mjs",
+    "release": "release-it --ci --no-increment",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@eslint/js": "latest",
-    "@microsoft/api-extractor": "^7.58.12",
-    "@tailwindcss/vite": "latest",
-    "@testing-library/jest-dom": "latest",
-    "@testing-library/react": "latest",
-    "@testing-library/user-event": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@vitejs/plugin-react": "latest",
-    "@vitest/coverage-v8": "latest",
-    "eslint": "latest",
-    "eslint-plugin-react-hooks": "latest",
-    "eslint-plugin-react-refresh": "latest",
-    "fast-check": "^4.9.0",
-    "globals": "latest",
-    "jsdom": "latest",
-    "publint": "^0.3.22",
-    "react": "latest",
-    "react-dom": "latest",
-    "tailwindcss": "latest",
-    "tw-animate-css": "latest",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "latest",
-    "vite": "latest",
-    "vite-plugin-dts": "latest",
-    "vitest": "latest"
-  },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true,
-    "registry": "https://registry.npmjs.org"
-  },
-  "keywords": [
-    "react",
-    "calculator",
-    "scientific-calculator",
-    "graphing-calculator",
-    "statistics",
-    "math-tools",
-    "vite",
-    "tailwindcss",
-    "shadcn"
-  ],
-  "license": "MIT",
-  "engines": {
-    "node": ">=20.19.0"
-  },
-  "packageManager": "pnpm@10.28.0",
-  "dependencies": {
-    "@fontsource-variable/inter": "^5.3.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.28.0",
-    "radix-ui": "^1.6.7",
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@tsconfig/vite-react": "^8.1.1",
+    "@typescript/typescript6": "^6.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.2.0",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "release-it": "^21.0.0",
     "shadcn": "^4.16.0",
-    "tailwind-merge": "^3.6.0"
-  }
+    "wrangler": "^4.116.0"
+  },
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "packageManager": "pnpm@10.28.0"
 }

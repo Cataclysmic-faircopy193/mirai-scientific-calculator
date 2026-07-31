@@ -1,6 +1,19 @@
-import { copyFile } from "node:fs/promises"
+import { copyFile, readdir } from "node:fs/promises"
+import path from "node:path"
 
-const declarations = new URL("../dist/index.d.ts", import.meta.url)
-const commonJsDeclarations = new URL("../dist/index.d.cts", import.meta.url)
+const dist = path.resolve(process.cwd(), process.argv[2] ?? "dist")
 
-await copyFile(declarations, commonJsDeclarations)
+async function copyDeclarations(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const source = path.join(directory, entry.name)
+    if (entry.isDirectory()) {
+      await copyDeclarations(source)
+      continue
+    }
+
+    if (!entry.name.endsWith(".d.ts")) continue
+    await copyFile(source, source.replace(/\.d\.ts$/, ".d.cts"))
+  }
+}
+
+await copyDeclarations(dist)

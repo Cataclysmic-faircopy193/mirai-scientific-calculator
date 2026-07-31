@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/release-it@21/schema/release-it.json",
+  "git": {
+    "commit": false,
+    "push": true,
+    "pushRepo": "origin",
+    "requireBranch": "main",
+    "requireCleanWorkingDir": true,
+    "requireUpstream": true,
+    "tag": true,
+    "tagName": "v${version}"
+  },
+  "npm": {
+    "publish": true,
+    "publishPath": "packages/calculator-core",
+    "publishArgs": ["--access", "public", "--provenance"]
+  },
+  "github": {
+    "assets": ["release/**/*"],
+    "release": true,
+    "releaseName": "v${version}"
+  },
+  "hooks": {
+    "before:init": "pnpm release:check",
+    "before:release": "pnpm release:assets",
+    "after:npm:release": "pnpm release:verify-published"
+  }
+}

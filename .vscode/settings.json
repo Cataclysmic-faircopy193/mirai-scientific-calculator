@@ -1,0 +1,18 @@
+{
+  // Set Oxc as the default formatter for JavaScript and TypeScript
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnSave": true,
+
+  // Automatically fix lint errors and apply formatting on save
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "always"
+  },
+
+  // Enable oxlint and oxfmt features explicitly
+  "oxc.enable": true,
+  "oxc.enable.oxlint": true,
+  "oxc.enable.oxfmt": true,
+
+  // Optional: Enable TypeScript type-aware diagnostics
+  "oxc.typeAware": true
+}
