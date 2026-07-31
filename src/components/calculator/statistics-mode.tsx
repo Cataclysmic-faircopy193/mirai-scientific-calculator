@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { BarChart3, LineChart, Sparkles } from "lucide-react"
+import { BarChart3, LineChart } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -496,7 +496,7 @@ export function StatisticsMode({
         </div>
 
         <div className="max-h-[310px] overflow-auto border-t bg-muted/25 p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             <div>
               <h3 className="text-sm font-semibold">
                 One-variable statistics · x list
@@ -505,10 +505,6 @@ export function StatisticsMode({
                 {xValues.length} valid values parsed
               </p>
             </div>
-            <Badge variant="outline" className="gap-1">
-              <Sparkles className="size-3" />
-              Live results
-            </Badge>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {statRows.map(([label, value]) => (
