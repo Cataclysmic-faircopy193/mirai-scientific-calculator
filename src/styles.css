@@ -154,7 +154,9 @@
 
 .mirai-mode-switcher {
   position: relative;
-  width: 358px;
+  flex: 0 1 364px;
+  width: 364px;
+  max-width: 100%;
 }
 
 .mirai-keypad-tabs-list {
@@ -216,6 +218,11 @@
 }
 
 @container mirai-calculator (max-width: 699px) {
+  .mirai-mode-switcher {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
   .mirai-scientific-layout,
   .mirai-graphing-layout,
   .mirai-statistics-layout {

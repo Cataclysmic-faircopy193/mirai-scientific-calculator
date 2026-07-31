@@ -235,8 +235,6 @@ export function MiraiCalculator({
   const activeTheme = theme ?? internalTheme
   const resolvedTheme =
     activeTheme === "system" ? (systemDark ? "dark" : "light") : activeTheme
-  const activeModeIndex = MODES.findIndex((item) => item.value === activeMode)
-
   useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)")
     const update = (event: MediaQueryListEvent) => setSystemDark(event.matches)
@@ -508,15 +506,8 @@ export function MiraiCalculator({
 
             <nav
               aria-label="Calculator modes"
-              className="mirai-mode-switcher order-3 grid w-full min-w-0 grid-cols-4 gap-0.5 overflow-hidden rounded-lg bg-muted p-[3px] sm:order-none sm:w-auto"
+              className="mirai-mode-switcher order-3 grid w-full min-w-0 max-w-full grid-cols-4 gap-0.5 overflow-hidden rounded-lg bg-muted p-[3px] sm:order-none"
             >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-[3px] left-[3px] w-[88px] rounded-md bg-background shadow-sm transition-transform duration-200 ease-out"
-                style={{
-                  transform: `translateX(${activeModeIndex * 90}px)`,
-                }}
-              />
               {MODES.map((item) => (
                 <Button
                   key={item.value}
@@ -525,7 +516,7 @@ export function MiraiCalculator({
                   onClick={() => setMode(item.value)}
                   aria-current={activeMode === item.value ? "page" : undefined}
                   data-active={activeMode === item.value ? "" : undefined}
-                  className="relative z-10 h-7 min-w-[88px] flex-1 rounded-md bg-transparent text-[13px] font-medium shadow-none hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:text-foreground sm:flex-none"
+                  className="h-7 min-w-0 w-full rounded-md bg-transparent px-1 text-[13px] font-medium shadow-none transition-[background-color,box-shadow,color] hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:bg-background data-active:text-foreground data-active:shadow-sm"
                 >
                   {item.label}
                 </Button>

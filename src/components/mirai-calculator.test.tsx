@@ -65,6 +65,23 @@ describe("MiraiCalculator", () => {
     expect(screen.getByText("Prism volume")).toBeInTheDocument()
   })
 
+  it("keeps the active mode highlight inside the responsive switcher", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator />)
+    const switcher = screen.getByRole("navigation", {
+      name: "Calculator modes",
+    })
+    const tools = screen.getByRole("button", { name: "Tools" })
+
+    await user.click(tools)
+
+    expect(switcher).toHaveClass("min-w-0", "max-w-full", "overflow-hidden")
+    expect(tools).toHaveAttribute("aria-current", "page")
+    expect(tools).toHaveAttribute("data-active")
+    expect(tools).toHaveClass("min-w-0", "w-full", "data-active:bg-background")
+    expect(switcher.querySelectorAll("button[data-active]")).toHaveLength(1)
+  })
+
   it("updates tool results as values change", async () => {
     const user = userEvent.setup()
     render(<MiraiCalculator defaultMode="tools" />)
