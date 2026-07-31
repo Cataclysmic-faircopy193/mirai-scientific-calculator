@@ -195,6 +195,47 @@ const LIST_FUNCTIONS = new Set([
   "cov",
 ])
 
+const SCALAR_FUNCTION_ARITY: Record<string, number | readonly [number, number]> = {
+  arcsin: 1,
+  arccos: 1,
+  arctan: 1,
+  arcsec: 1,
+  arccsc: 1,
+  arccot: 1,
+  asin: 1,
+  acos: 1,
+  atan: 1,
+  asec: 1,
+  acsc: 1,
+  acot: 1,
+  sin: 1,
+  cos: 1,
+  tan: 1,
+  sec: 1,
+  csc: 1,
+  cot: 1,
+  sinh: 1,
+  cosh: 1,
+  tanh: 1,
+  sqrt: 1,
+  cbrt: 1,
+  log: 1,
+  ln: 1,
+  exp: 1,
+  abs: 1,
+  floor: 1,
+  ceil: 1,
+  sign: 1,
+  nthroot: 2,
+  logb: 2,
+  gcd: 2,
+  lcm: 2,
+  mod: 2,
+  ncr: 2,
+  npr: 2,
+  round: [1, 2],
+}
+
 function isNumericArray(value: CalculatorValue): value is number[] {
   return Array.isArray(value)
 }
@@ -213,8 +254,12 @@ function cleanNumber(value: number): number {
 }
 
 export function greatestCommonDivisor(a: number, b: number): number {
-  let left = Math.abs(Math.round(a))
-  let right = Math.abs(Math.round(b))
+  if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) {
+    throw new Error("gcd needs safe whole numbers")
+  }
+
+  let left = Math.abs(a)
+  let right = Math.abs(b)
 
   while (right !== 0) {
     ;[left, right] = [right, left % right]
@@ -234,13 +279,46 @@ export function factorial(value: number): number {
 }
 
 function permutations(n: number, r: number): number {
-  if (!Number.isInteger(n) || !Number.isInteger(r) || n < 0 || r < 0 || r > n) {
+  if (
+    !Number.isSafeInteger(n) ||
+    !Number.isSafeInteger(r) ||
+    n < 0 ||
+    r < 0 ||
+    r > n
+  ) {
     throw new Error("nPr needs whole numbers where 0 ≤ r ≤ n")
   }
 
   let result = 1
-  for (let index = 0; index < r; index += 1) result *= n - index
+  for (let index = 0; index < r; index += 1) {
+    result *= n - index
+    if (!Number.isFinite(result)) {
+      throw new Error("Result is too large to display")
+    }
+  }
   return result
+}
+
+function combinations(n: number, r: number): number {
+  if (
+    !Number.isSafeInteger(n) ||
+    !Number.isSafeInteger(r) ||
+    n < 0 ||
+    r < 0 ||
+    r > n
+  ) {
+    throw new Error("nCr needs whole numbers where 0 ≤ r ≤ n")
+  }
+
+  const count = Math.min(r, n - r)
+  let result = 1
+  for (let index = 1; index <= count; index += 1) {
+    result = (result * (n - count + index)) / index
+    if (!Number.isFinite(result)) {
+      throw new Error("Result is too large to display")
+    }
+  }
+  return cleanNumber(result)
 }
 
 export class CalculatorEngine {
@@ -386,20 +464,16 @@ export class CalculatorEngine {
       const character = expression[index]
 
       if (/[0-9.]/.test(character)) {
-        let end = index
-        while (end < expression.length && /[0-9.]/.test(expression[end])) end += 1
-        if (
-          /[eE]/.test(expression[end] ?? "") &&
-          /[0-9+-]/.test(expression[end + 1] ?? "")
-        ) {
-          end += 1
-          if (/[+-]/.test(expression[end])) end += 1
-          while (end < expression.length && /[0-9]/.test(expression[end])) end += 1
+        const match = expression
+          .slice(index)
+          .match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/)
+        if (!match || expression[index + match[0].length] === ".") {
+          throw new Error("Invalid number")
         }
-        const number = Number(expression.slice(index, end))
+        const number = Number(match[0])
         if (!Number.isFinite(number)) throw new Error("Invalid number")
         tokens.push({ type: "number", value: number })
-        index = end
+        index += match[0].length
         continue
       }
 
@@ -461,8 +535,8 @@ export class CalculatorEngine {
       return true
     }
 
-    const parseTop = (): AstNode => {
-      const left = parseExpression()
+    const parseTop = (stopAtAbsoluteBar = false): AstNode => {
+      const left = parseExpression(stopAtAbsoluteBar)
       const relation = peek()?.type
       if (
         relation &&
@@ -473,37 +547,53 @@ export class CalculatorEngine {
           op: "compare",
           relation,
           left,
-          right: parseExpression(),
+          right: parseExpression(stopAtAbsoluteBar),
         }
       }
       return left
     }
 
-    const parseExpression = (): AstNode => {
-      let node = parseTerm()
+    const parseExpression = (stopAtAbsoluteBar = false): AstNode => {
+      let node = parseTerm(stopAtAbsoluteBar)
       while (peek()?.type === "+" || peek()?.type === "-") {
         const op = tokens[position].type as "+" | "-"
         position += 1
-        node = { op, left: node, right: parseTerm() }
+        node = { op, left: node, right: parseTerm(stopAtAbsoluteBar) }
       }
       return node
     }
 
-    const startsImplicitTerm = (token: Token | undefined) =>
-      token &&
-      ["number", "variable", "function", "(", "|", "["].includes(token.type)
+    const startsImplicitTerm = (
+      token: Token | undefined,
+      stopAtAbsoluteBar: boolean,
+    ) =>
+      Boolean(
+        token &&
+          !(stopAtAbsoluteBar && token.type === "|") &&
+          ["number", "variable", "function", "(", "|", "["].includes(
+            token.type,
+          ),
+      )
 
-    const parseTerm = (): AstNode => {
-      let node = parseUnary()
+    const parseTerm = (stopAtAbsoluteBar = false): AstNode => {
+      let node = parseUnary(stopAtAbsoluteBar)
       for (;;) {
         const token = peek()
         if (token?.type === "*" || token?.type === "/") {
           position += 1
-          node = { op: token.type, left: node, right: parseUnary() }
+          node = {
+            op: token.type,
+            left: node,
+            right: parseUnary(stopAtAbsoluteBar),
+          }
           continue
         }
-        if (startsImplicitTerm(token)) {
-          node = { op: "*", left: node, right: parseUnary() }
+        if (startsImplicitTerm(token, stopAtAbsoluteBar)) {
+          node = {
+            op: "*",
+            left: node,
+            right: parseUnary(stopAtAbsoluteBar),
+          }
           continue
         }
         break
@@ -511,20 +601,32 @@ export class CalculatorEngine {
       return node
     }
 
-    const parseUnary = (): AstNode => {
-      if (eat("-")) return { op: "negative", left: parseUnary() }
-      if (eat("+")) return parseUnary()
-      return parsePostfix()
+    const parseUnary = (stopAtAbsoluteBar = false): AstNode => {
+      if (eat("-")) {
+        return { op: "negative", left: parseUnary(stopAtAbsoluteBar) }
+      }
+      if (eat("+")) return parseUnary(stopAtAbsoluteBar)
+      return parsePower(stopAtAbsoluteBar)
     }
 
-    const parsePostfix = (): AstNode => {
-      let node = parsePower()
+    const parsePostfix = (stopAtAbsoluteBar = false): AstNode => {
+      let node = parseAtom(stopAtAbsoluteBar)
+      let usedFactorial = false
+      let usedPercent = false
       for (;;) {
         if (eat("!")) {
+          if (usedFactorial) {
+            throw new Error("Repeated factorial is not supported")
+          }
+          usedFactorial = true
           node = { op: "factorial", left: node }
           continue
         }
         if (eat("%")) {
+          if (usedPercent) {
+            throw new Error("Repeated percent is not supported")
+          }
+          usedPercent = true
           node = { op: "percent", left: node }
           continue
         }
@@ -533,9 +635,15 @@ export class CalculatorEngine {
       return node
     }
 
-    const parsePower = (): AstNode => {
-      const base = parseAtom()
-      if (eat("^")) return { op: "^", left: base, right: parseUnary() }
+    const parsePower = (stopAtAbsoluteBar = false): AstNode => {
+      const base = parsePostfix(stopAtAbsoluteBar)
+      if (eat("^")) {
+        return {
+          op: "^",
+          left: base,
+          right: parseUnary(stopAtAbsoluteBar),
+        }
+      }
       return base
     }
 
@@ -547,7 +655,7 @@ export class CalculatorEngine {
       return args
     }
 
-    const parseAtom = (): AstNode => {
+    const parseAtom = (stopAtAbsoluteBar = false): AstNode => {
       const token = peek()
       if (!token) throw new Error("Expression is incomplete")
 
@@ -593,7 +701,11 @@ export class CalculatorEngine {
         if (eat("(")) {
           return { op: "call", functionName, args: parseArguments() }
         }
-        return { op: "call", functionName, args: [parseAtom()] }
+        return {
+          op: "call",
+          functionName,
+          args: [parseAtom(stopAtAbsoluteBar)],
+        }
       }
 
       if (eat("(")) {
@@ -603,7 +715,7 @@ export class CalculatorEngine {
       }
 
       if (eat("|")) {
-        const node = parseTop()
+        const node = parseTop(true)
         if (!eat("|")) throw new Error("Missing closing absolute-value bar")
         return { op: "call", functionName: "abs", args: [node] }
       }
@@ -690,23 +802,38 @@ export class CalculatorEngine {
     right: CalculatorValue,
   ): CalculatorValue {
     if (isNumericArray(left) || isNumericArray(right)) {
+      if (
+        isNumericArray(left) &&
+        isNumericArray(right) &&
+        left.length !== right.length
+      ) {
+        throw new Error("Lists must have the same length")
+      }
       const length = Math.max(
         isNumericArray(left) ? left.length : 0,
         isNumericArray(right) ? right.length : 0,
       )
-      const results = Array.from({ length }, (_, index) =>
-        operation(
+      const results = Array.from({ length }, (_, index) => {
+        const result = operation(
           isNumericArray(left) ? left[index] : asNumber(left),
           isNumericArray(right) ? right[index] : asNumber(right),
-        ),
-      )
+        )
+        if (typeof result === "number" && !Number.isFinite(result)) {
+          throw new Error("Result is outside the supported numeric range")
+        }
+        return result
+      })
       if (results.every((value): value is number => typeof value === "number")) {
         return results
       }
       throw new Error("Boolean list results cannot be used here")
     }
 
-    return operation(asNumber(left), asNumber(right))
+    const result = operation(asNumber(left), asNumber(right))
+    if (typeof result === "number" && !Number.isFinite(result)) {
+      throw new Error("Result is outside the supported numeric range")
+    }
+    return result
   }
 
   private evaluateNode(node: AstNode, scope: EvaluationScope): CalculatorValue {
@@ -762,9 +889,16 @@ export class CalculatorEngine {
         const values = (node.args ?? []).map((argument) =>
           asNumber(this.evaluateNode(argument, scope)),
         )
+        if (values.length !== definition.parameters.length) {
+          throw new Error(
+            `${node.name} needs ${definition.parameters.length} ${
+              definition.parameters.length === 1 ? "value" : "values"
+            }`,
+          )
+        }
         const functionLocals = { ...scope.locals }
         definition.parameters.forEach((parameter, index) => {
-          functionLocals[parameter] = values[index] ?? Number.NaN
+          functionLocals[parameter] = values[index]
         })
         return this.evaluateNode(this.parseCached(definition.source), {
           ...scope,
@@ -802,6 +936,9 @@ export class CalculatorEngine {
       case "^":
         return this.lift(
           (a, b) => {
+            if (a === 0 && b === 0) {
+              throw new Error("Undefined: zero to the zero power")
+            }
             if (a === 0 && b < 0) {
               throw new Error("Undefined: zero to a negative power")
             }
@@ -831,28 +968,56 @@ export class CalculatorEngine {
         const values = (node.args ?? []).map((argument) =>
           this.evaluateNode(argument, scope),
         )
-        if (LIST_FUNCTIONS.has(node.functionName!)) {
-          return this.evaluateListFunction(node.functionName!, values)
+        const functionName = node.functionName!
+        if (LIST_FUNCTIONS.has(functionName)) {
+          return this.evaluateListFunction(functionName, values)
+        }
+        const arity = SCALAR_FUNCTION_ARITY[functionName]
+        const minimum = Array.isArray(arity) ? arity[0] : arity
+        const maximum = Array.isArray(arity) ? arity[1] : arity
+        if (
+          arity === undefined ||
+          values.length < minimum ||
+          values.length > maximum
+        ) {
+          const expected =
+            minimum === maximum ? String(minimum) : `${minimum} or ${maximum}`
+          throw new Error(
+            `${functionName} needs ${expected} ${
+              maximum === 1 ? "value" : "values"
+            }`,
+          )
+        }
+        const evaluateScalar = (args: number[]) => {
+          const result = this.evaluateScalarFunction(
+            functionName,
+            args,
+            angleFactor,
+          )
+          if (!Number.isFinite(result)) {
+            throw new Error("Result is outside the supported numeric range")
+          }
+          return result
         }
         if (values.some(isNumericArray)) {
           const length = Math.max(
             ...values.map((value) => (isNumericArray(value) ? value.length : 0)),
           )
+          const listLengths = values
+            .filter(isNumericArray)
+            .map((value) => value.length)
+          if (new Set(listLengths).size > 1) {
+            throw new Error("Lists must have the same length")
+          }
           return Array.from({ length }, (_, index) =>
-            this.evaluateScalarFunction(
-              node.functionName!,
+            evaluateScalar(
               values.map((value) =>
                 isNumericArray(value) ? value[index] : asNumber(value),
               ),
-              angleFactor,
             ),
           )
         }
-        return this.evaluateScalarFunction(
-          node.functionName!,
-          values.map(asNumber),
-          angleFactor,
-        )
+        return evaluateScalar(values.map(asNumber))
       }
     }
   }
@@ -868,11 +1033,68 @@ export class CalculatorEngine {
     rawValues: CalculatorValue[],
   ): CalculatorValue {
     if (functionName === "corr" || functionName === "cov") {
-      const left = Array.isArray(rawValues[0]) ? rawValues[0] : []
-      const right = Array.isArray(rawValues[1]) ? rawValues[1] : []
+      if (
+        rawValues.length !== 2 ||
+        !Array.isArray(rawValues[0]) ||
+        !Array.isArray(rawValues[1])
+      ) {
+        throw new Error(`${functionName} needs two lists`)
+      }
+      const left = rawValues[0]
+      const right = rawValues[1]
+      if (left.length !== right.length) {
+        throw new Error("Paired lists must have the same length")
+      }
       return functionName === "corr"
         ? correlation(left, right)
         : covariance(left, right)
+    }
+
+    if (functionName === "quantile") {
+      if (
+        rawValues.length !== 2 ||
+        !Array.isArray(rawValues[0]) ||
+        typeof rawValues[1] !== "number"
+      ) {
+        throw new Error("quantile needs a list and a percentile")
+      }
+      const percentile = rawValues[1]
+      if (percentile < 0 || percentile > 1) {
+        throw new Error("quantile percentile must be between 0 and 1")
+      }
+      const sample = [...rawValues[0]].sort((a, b) => a - b)
+      if (sample.length === 0) throw new Error("Not enough data for quantile")
+      return quantile(sample, percentile)
+    }
+
+    if (functionName === "quartile") {
+      let sample: number[]
+      let quartileIndex = 1
+      if (rawValues.length === 2 && Array.isArray(rawValues[0])) {
+        if (typeof rawValues[1] !== "number") {
+          throw new Error("quartile needs a numeric quartile index")
+        }
+        sample = rawValues[0]
+        quartileIndex = rawValues[1]
+      } else if (rawValues.length === 1 && Array.isArray(rawValues[0])) {
+        sample = rawValues[0]
+      } else if (rawValues.some(isNumericArray)) {
+        throw new Error("quartile needs one list and an optional index")
+      } else {
+        sample = this.flatten(rawValues)
+      }
+      if (
+        !Number.isInteger(quartileIndex) ||
+        quartileIndex < 0 ||
+        quartileIndex > 4
+      ) {
+        throw new Error("quartile index must be a whole number from 0 to 4")
+      }
+      if (sample.length === 0) throw new Error("Not enough data for quartile")
+      return quantile(
+        [...sample].sort((a, b) => a - b),
+        quartileIndex / 4,
+      )
     }
 
     const values = this.flatten(rawValues)
@@ -893,37 +1115,27 @@ export class CalculatorEngine {
       case "median":
         return statistics.median
       case "mode":
-        return statistics.mode ?? Number.NaN
+        if (statistics.mode === null) throw new Error("The data has no mode")
+        return statistics.mode
       case "min":
         return statistics.min
       case "max":
         return statistics.max
       case "range":
         return statistics.range
-      case "quartile": {
-        const last = rawValues.at(-1)
-        return typeof last === "number" && rawValues.length > 1
-          ? quantile(statistics.sorted, last / 4)
-          : statistics.q1
-      }
-      case "quantile": {
-        const percentile = rawValues.at(-1)
-        if (typeof percentile !== "number") {
-          throw new Error("quantile needs a percentile")
-        }
-        const sample =
-          rawValues.length > 1
-            ? this.flatten(rawValues.slice(0, -1)).sort((a, b) => a - b)
-            : statistics.sorted
-        return quantile(sample, percentile)
-      }
       case "iqr":
         return statistics.iqr
       case "stdev":
+        if (statistics.n < 2) {
+          throw new Error("Sample standard deviation needs at least two values")
+        }
         return statistics.sampleStandardDeviation
       case "stdevp":
         return statistics.populationStandardDeviation
       case "var":
+        if (statistics.n < 2) {
+          throw new Error("Sample variance needs at least two values")
+        }
         return statistics.sampleVariance
       case "varp":
         return statistics.populationVariance
@@ -939,6 +1151,9 @@ export class CalculatorEngine {
     args: number[],
     angleFactor: number,
   ): number {
+    if (args.some((value) => !Number.isFinite(value))) {
+      throw new Error(`${functionName} needs finite values`)
+    }
     const need = (count: number) => {
       if (args.length < count || !Number.isFinite(args[count - 1])) {
         throw new Error(`${functionName} needs ${count} values`)
@@ -961,12 +1176,29 @@ export class CalculatorEngine {
         }
         return cleanNumber(Math.tan(args[0] * angleFactor))
       }
-      case "sec":
-        return cleanNumber(1 / Math.cos(args[0] * angleFactor))
-      case "csc":
-        return cleanNumber(1 / Math.sin(args[0] * angleFactor))
-      case "cot":
-        return cleanNumber(1 / Math.tan(args[0] * angleFactor))
+      case "sec": {
+        const cosine = Math.cos(args[0] * angleFactor)
+        if (Math.abs(cosine) < 1e-14) {
+          throw new Error("Undefined: secant is not defined here")
+        }
+        return cleanNumber(1 / cosine)
+      }
+      case "csc": {
+        const sine = Math.sin(args[0] * angleFactor)
+        if (Math.abs(sine) < 1e-14) {
+          throw new Error("Undefined: cosecant is not defined here")
+        }
+        return cleanNumber(1 / sine)
+      }
+      case "cot": {
+        const sine = Math.sin(args[0] * angleFactor)
+        if (Math.abs(sine) < 1e-14) {
+          throw new Error("Undefined: cotangent is not defined here")
+        }
+        return cleanNumber(
+          Math.cos(args[0] * angleFactor) / sine,
+        )
+      }
       case "asin":
       case "arcsin":
         if (Math.abs(args[0]) > 1) throw new Error("Result is not a real number")
@@ -1000,9 +1232,23 @@ export class CalculatorEngine {
         return Math.sqrt(args[0])
       case "cbrt":
         return Math.cbrt(args[0])
-      case "nthroot":
+      case "nthroot": {
         need(2)
-        return Math.sign(args[1]) * Math.abs(args[1]) ** (1 / args[0])
+        const degree = args[0]
+        const radicand = args[1]
+        if (degree === 0) {
+          throw new Error("Undefined: root degree cannot be zero")
+        }
+        if (
+          radicand < 0 &&
+          (!Number.isInteger(degree) || Math.abs(degree) % 2 === 0)
+        ) {
+          throw new Error("Result is not a real number")
+        }
+        return radicand < 0
+          ? -(Math.abs(radicand) ** (1 / degree))
+          : radicand ** (1 / degree)
+      }
       case "log":
         if (args[0] <= 0) {
           throw new Error("Undefined: logarithm needs a positive value")
@@ -1028,9 +1274,13 @@ export class CalculatorEngine {
       case "ceil":
         return Math.ceil(args[0])
       case "round":
-        return args.length > 1
-          ? Math.round(args[0] * 10 ** args[1]) / 10 ** args[1]
-          : Math.round(args[0])
+        if (args.length === 1) return Math.round(args[0])
+        if (!Number.isInteger(args[1]) || Math.abs(args[1]) > 100) {
+          throw new Error(
+            "round precision must be a whole number from −100 to 100",
+          )
+        }
+        return Math.round(args[0] * 10 ** args[1]) / 10 ** args[1]
       case "sign":
         return Math.sign(args[0])
       case "gcd":
@@ -1038,29 +1288,28 @@ export class CalculatorEngine {
         return greatestCommonDivisor(args[0], args[1])
       case "lcm":
         need(2)
-        return (
-          Math.abs(args[0] * args[1]) /
-          greatestCommonDivisor(args[0], args[1])
+        if (
+          !Number.isSafeInteger(args[0]) ||
+          !Number.isSafeInteger(args[1])
+        ) {
+          throw new Error("lcm needs safe whole numbers")
+        }
+        if (args[0] === 0 || args[1] === 0) return 0
+        return Math.abs(
+          (args[0] / greatestCommonDivisor(args[0], args[1])) * args[1],
         )
       case "mod":
         need(2)
+        if (args[1] === 0) {
+          throw new Error("Undefined: modulo by zero")
+        }
         return ((args[0] % args[1]) + args[1]) % args[1]
       case "ncr":
         need(2)
-        return permutations(args[0], args[1]) / factorial(args[1])
+        return combinations(args[0], args[1])
       case "npr":
         need(2)
         return permutations(args[0], args[1])
-      case "min":
-        return Math.min(...args)
-      case "max":
-        return Math.max(...args)
-      case "mean":
-        return args.reduce((sum, value) => sum + value, 0) / args.length
-      case "median":
-        return calculateStatistics(args).median
-      case "stdev":
-        return calculateStatistics(args).sampleStandardDeviation
       default:
         throw new Error(`Unknown function "${functionName}"`)
     }

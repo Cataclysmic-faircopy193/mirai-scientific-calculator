@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { Redo2, Undo2, X } from "lucide-react"
+import { Delete, Redo2, Undo2, X, type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,8 +21,9 @@ interface HistoryEntry {
 
 interface KeyDefinition {
   label: string
+  icon?: LucideIcon
   token?: string
-  action?: "backspace" | "clear" | "evaluate" | "left" | "right"
+  action?: "absolute" | "backspace" | "clear" | "evaluate" | "left" | "right"
   tone?: "default" | "operator" | "primary"
   ariaLabel?: string
   span?: 2
@@ -41,7 +42,12 @@ const BASIC_KEYS: KeyDefinition[] = [
   { label: ")" },
   { label: "%", ariaLabel: "Percent" },
   { label: "÷", tone: "operator", ariaLabel: "Divide" },
-  { label: "⌫", action: "backspace", ariaLabel: "Backspace" },
+  {
+    label: "Backspace",
+    icon: Delete,
+    action: "backspace",
+    ariaLabel: "Backspace",
+  },
   { label: "C", action: "clear", ariaLabel: "Clear" },
   { label: "7" },
   { label: "8" },
@@ -59,7 +65,7 @@ const BASIC_KEYS: KeyDefinition[] = [
   { label: "2" },
   { label: "3" },
   { label: "+", tone: "operator", ariaLabel: "Add" },
-  { label: "|x|", token: "|" },
+  { label: "|x|", action: "absolute", ariaLabel: "Absolute value" },
   { label: "e", token: "e" },
   { label: "±", token: "−", ariaLabel: "Toggle sign" },
   { label: "0" },
@@ -81,7 +87,7 @@ const FUNCTION_KEYS: KeyDefinition[] = [
   { label: "√", token: "√(" },
   { label: "∛", token: "∛(" },
   { label: "1/x", token: "1÷(" },
-  { label: "|x|", token: "|" },
+  { label: "|x|", action: "absolute", ariaLabel: "Absolute value" },
   { label: "10ˣ", token: "10^(" },
   { label: "eˣ", token: "exp(" },
   { label: "log", token: "log(" },
@@ -255,6 +261,22 @@ export function ScientificMode({
     )
   }
 
+  const insertAbsoluteValue = () => {
+    const input = inputRef.current
+    const start = input?.selectionStart ?? expression.length
+    const end = input?.selectionEnd ?? start
+    const selected = expression.slice(start, end)
+    const wrapped = `|${selected}|`
+    const next =
+      expression.slice(0, start) + wrapped + expression.slice(end)
+    updateExpression(next)
+    const cursor = selected ? start + wrapped.length : start + 1
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.setSelectionRange(cursor, cursor)
+    })
+  }
+
   const commit = () => {
     if (!expression.trim()) return
     try {
@@ -288,6 +310,7 @@ export function ScientificMode({
   }
 
   const pressKey = (key: KeyDefinition) => {
+    if (key.action === "absolute") return insertAbsoluteValue()
     if (key.action === "backspace") return removePreviousCharacter()
     if (key.action === "clear") return updateExpression("")
     if (key.action === "evaluate") return commit()
@@ -339,7 +362,7 @@ export function ScientificMode({
             placeholder="Type or tap to start"
             autoComplete="off"
             spellCheck={false}
-            className="h-auto border-0 bg-transparent px-0 text-right font-mono text-2xl font-medium tracking-tight shadow-none focus-visible:ring-0 dark:bg-transparent sm:text-[32px]"
+            className="h-auto border-0 bg-transparent px-0 text-right font-sans !text-[28px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0 dark:bg-transparent sm:!text-[34px]"
           />
           <div
             aria-live="polite"
@@ -355,8 +378,9 @@ export function ScientificMode({
             )}
             <span
               className={cn(
-                "font-mono text-xl font-semibold text-primary sm:text-2xl",
-                liveResult?.error && "max-w-full text-sm text-destructive",
+                "font-sans text-2xl font-semibold tracking-[-0.015em] text-primary sm:text-[28px]",
+                liveResult?.error &&
+                  "max-w-full text-lg leading-tight text-destructive sm:text-xl",
               )}
             >
               {liveResult?.text ?? " "}
@@ -420,22 +444,25 @@ export function ScientificMode({
             </TabsTrigger>
           </TabsList>
           <div className="grid min-h-[246px] flex-1 grid-cols-6 auto-rows-fr gap-2 p-4">
-            {KEY_SETS[tab].map((key, index) => (
-              <Button
-                key={`${key.label}-${index}`}
-                variant={key.tone === "primary" ? "default" : "outline"}
-                onClick={() => pressKey(key)}
-                aria-label={key.ariaLabel ?? key.label}
-                className={cn(
-                  "h-auto min-h-11 min-w-0 rounded-[6px] font-mono text-[15px]",
-                  key.tone === "operator" &&
-                    "border-primary/25 bg-primary/5 text-primary hover:bg-primary/10",
-                  key.span === 2 && "col-span-2",
-                )}
-              >
-                {key.label}
-              </Button>
-            ))}
+            {KEY_SETS[tab].map((key, index) => {
+              const Icon = key.icon
+              return (
+                <Button
+                  key={`${key.label}-${index}`}
+                  variant={key.tone === "primary" ? "default" : "outline"}
+                  onClick={() => pressKey(key)}
+                  aria-label={key.ariaLabel ?? key.label}
+                  className={cn(
+                    "h-auto min-h-11 min-w-0 rounded-[6px] font-sans text-base font-medium sm:text-[17px]",
+                    key.tone === "operator" &&
+                      "border-primary/25 bg-primary/5 text-primary hover:bg-primary/10",
+                    key.span === 2 && "col-span-2",
+                  )}
+                >
+                  {Icon ? <Icon aria-hidden="true" /> : key.label}
+                </Button>
+              )
+            })}
           </div>
         </Tabs>
 
@@ -468,7 +495,7 @@ export function ScientificMode({
                       }
                       placeholder="a = 5"
                       aria-label={`Definition ${index + 1}`}
-                      className="h-[30px] rounded-md bg-background px-2 font-mono text-sm"
+                      className="h-8 rounded-md bg-background px-2.5 font-sans text-[15px] font-medium"
                     />
                     <Button
                       variant="ghost"
@@ -526,7 +553,7 @@ export function ScientificMode({
                   </span>
                   <span
                     className={cn(
-                      "font-mono text-base font-semibold",
+                      "font-sans text-[17px] font-semibold",
                       entry.error && "text-destructive",
                     )}
                   >

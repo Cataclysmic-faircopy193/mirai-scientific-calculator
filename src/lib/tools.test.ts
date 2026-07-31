@@ -29,6 +29,18 @@ describe("calculator tools", () => {
     })
   })
 
+  it("simplifies decimal ratios without rounding them to whole inputs", () => {
+    expect(calculateRatio(1.5, 2.25, 2)).toEqual({
+      simplifiedLeft: 2,
+      simplifiedRight: 3,
+      scaledLeft: 3,
+      scaledRight: 4.5,
+      decimal: 2 / 3,
+      gcd: 0.75,
+      lcm: 4.5,
+    })
+  })
+
   it("calculates coordinate geometry", () => {
     const result = calculateCoordinates(-2, 1, 4, 9)
 

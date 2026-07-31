@@ -1,5 +1,12 @@
 import { greatestCommonDivisor } from "@/lib/calculator-engine"
 
+function decimalPlaces(value: number): number {
+  const [coefficient, exponentSource] = String(value).toLowerCase().split("e")
+  const fractionLength = coefficient.split(".")[1]?.length ?? 0
+  const exponent = Number(exponentSource ?? 0)
+  return Math.max(0, Math.min(12, fractionLength - exponent))
+}
+
 export interface PercentResults {
   portion: number
   increased: number
@@ -35,18 +42,24 @@ export function calculateRatio(
   right: number,
   scale: number,
 ): RatioResults {
-  const gcd = greatestCommonDivisor(left, right) || 1
+  const multiplier =
+    10 ** Math.max(decimalPlaces(left), decimalPlaces(right))
+  const integerLeft = Math.round(left * multiplier)
+  const integerRight = Math.round(right * multiplier)
+  const integerGcd = greatestCommonDivisor(integerLeft, integerRight)
+  const simplifier = integerGcd || 1
+  const gcd = integerGcd / multiplier
   return {
-    simplifiedLeft: left / gcd,
-    simplifiedRight: right / gcd,
+    simplifiedLeft: integerLeft / simplifier,
+    simplifiedRight: integerRight / simplifier,
     scaledLeft: left * scale,
     scaledRight: right * scale,
     decimal: right === 0 ? Number.NaN : left / right,
-    gcd,
+    gcd: integerGcd === 0 ? 0 : gcd,
     lcm:
       left === 0 || right === 0
         ? 0
-        : Math.abs(left * right) / greatestCommonDivisor(left, right),
+        : Math.abs(left * right) / gcd,
   }
 }
 

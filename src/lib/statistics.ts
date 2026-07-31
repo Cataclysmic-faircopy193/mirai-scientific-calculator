@@ -51,10 +51,18 @@ export function parseNumberList(source: string): number[] {
 }
 
 export function quantile(sortedValues: number[], percentile: number): number {
-  if (sortedValues.length === 0) return Number.NaN
+  if (sortedValues.length === 0) {
+    throw new Error("Quantile needs at least one value")
+  }
+  if (
+    !Number.isFinite(percentile) ||
+    percentile < 0 ||
+    percentile > 1
+  ) {
+    throw new Error("Quantile percentile must be between 0 and 1")
+  }
 
-  const clamped = Math.min(1, Math.max(0, percentile))
-  const index = (sortedValues.length - 1) * clamped
+  const index = (sortedValues.length - 1) * percentile
   const lower = Math.floor(index)
   const upper = Math.ceil(index)
 
@@ -67,6 +75,9 @@ export function quantile(sortedValues: number[], percentile: number): number {
 export function calculateStatistics(values: number[]): DescriptiveStatistics {
   if (values.length === 0) {
     throw new Error("At least one finite value is required")
+  }
+  if (values.some((value) => !Number.isFinite(value))) {
+    throw new Error("Statistics require finite values")
   }
 
   const sorted = [...values].sort((a, b) => a - b)
@@ -120,7 +131,16 @@ export function calculateStatistics(values: number[]): DescriptiveStatistics {
 }
 
 export function covariance(xValues: number[], yValues: number[]): number {
-  const pairCount = Math.min(xValues.length, yValues.length)
+  if (xValues.length !== yValues.length) {
+    throw new Error("Paired lists must have the same length")
+  }
+  if (
+    xValues.some((value) => !Number.isFinite(value)) ||
+    yValues.some((value) => !Number.isFinite(value))
+  ) {
+    throw new Error("Covariance requires finite values")
+  }
+  const pairCount = xValues.length
   if (pairCount < 2) throw new Error("At least two paired values are required")
 
   const xs = xValues.slice(0, pairCount)
@@ -139,7 +159,16 @@ export function covariance(xValues: number[], yValues: number[]): number {
 }
 
 export function correlation(xValues: number[], yValues: number[]): number {
-  const pairCount = Math.min(xValues.length, yValues.length)
+  if (xValues.length !== yValues.length) {
+    throw new Error("Paired lists must have the same length")
+  }
+  if (
+    xValues.some((value) => !Number.isFinite(value)) ||
+    yValues.some((value) => !Number.isFinite(value))
+  ) {
+    throw new Error("Correlation requires finite values")
+  }
+  const pairCount = xValues.length
   if (pairCount < 2) throw new Error("At least two paired values are required")
 
   const xs = xValues.slice(0, pairCount)
@@ -159,7 +188,10 @@ export function correlation(xValues: number[], yValues: number[]): number {
   }
 
   const denominator = Math.sqrt(xSquares * ySquares)
-  return denominator === 0 ? Number.NaN : cross / denominator
+  if (denominator === 0) {
+    throw new Error("Correlation is undefined for a constant list")
+  }
+  return cross / denominator
 }
 
 function solveLinearSystem(matrix: number[][], vector: number[]): number[] | null {
@@ -272,23 +304,27 @@ export function fitRegression(
   yInput: number[],
   model: RegressionModel,
 ): RegressionResult {
-  const pairCount = Math.min(xInput.length, yInput.length)
+  if (xInput.length !== yInput.length) {
+    return failedRegression("X and Y lists must have the same length.")
+  }
+  if (
+    xInput.some((value) => !Number.isFinite(value)) ||
+    yInput.some((value) => !Number.isFinite(value))
+  ) {
+    return failedRegression("Regression needs finite X and Y values.")
+  }
+  const pairCount = xInput.length
   if (pairCount < 2) {
     return failedRegression("Enter at least two paired x and y values.")
   }
 
-  let xValues = xInput.slice(0, pairCount)
-  let yValues = yInput.slice(0, pairCount)
+  const xValues = [...xInput]
+  const yValues = [...yInput]
 
   if (model === "exponential") {
-    const pairs = xValues
-      .map((x, index) => [x, yValues[index]] as const)
-      .filter((pair) => pair[1] > 0)
-    if (pairs.length < 2) {
+    if (yValues.some((value) => value <= 0)) {
       return failedRegression("Exponential regression needs positive y values.")
     }
-    xValues = pairs.map((pair) => pair[0])
-    yValues = pairs.map((pair) => pair[1])
     const transformed = yValues.map(Math.log)
     const coefficients = polynomialCoefficients(xValues, transformed, 1)
     if (!coefficients) return failedRegression("The data cannot be fitted.")
@@ -307,14 +343,9 @@ export function fitRegression(
   }
 
   if (model === "logarithmic") {
-    const pairs = xValues
-      .map((x, index) => [x, yValues[index]] as const)
-      .filter((pair) => pair[0] > 0)
-    if (pairs.length < 2) {
+    if (xValues.some((value) => value <= 0)) {
       return failedRegression("Logarithmic regression needs positive x values.")
     }
-    xValues = pairs.map((pair) => pair[0])
-    yValues = pairs.map((pair) => pair[1])
     const loggedX = xValues.map(Math.log)
     const coefficients = polynomialCoefficients(loggedX, yValues, 1)
     if (!coefficients) return failedRegression("The data cannot be fitted.")
@@ -332,14 +363,12 @@ export function fitRegression(
   }
 
   if (model === "power") {
-    const pairs = xValues
-      .map((x, index) => [x, yValues[index]] as const)
-      .filter((pair) => pair[0] > 0 && pair[1] > 0)
-    if (pairs.length < 2) {
+    if (
+      xValues.some((value) => value <= 0) ||
+      yValues.some((value) => value <= 0)
+    ) {
       return failedRegression("Power regression needs positive x and y values.")
     }
-    xValues = pairs.map((pair) => pair[0])
-    yValues = pairs.map((pair) => pair[1])
     const coefficients = polynomialCoefficients(
       xValues.map(Math.log),
       yValues.map(Math.log),

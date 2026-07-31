@@ -35,6 +35,13 @@ describe("statistics utilities", () => {
     expect(covariance(x, y)).toBeCloseTo(10 / 3)
   })
 
+  it("rejects invalid statistical domains instead of truncating or clamping", () => {
+    expect(() => calculateStatistics([1, Number.NaN])).toThrow(/finite/i)
+    expect(() => quantile([1, 2, 3], -0.1)).toThrow(/between 0 and 1/i)
+    expect(() => covariance([1, 2], [1])).toThrow(/same length/i)
+    expect(() => correlation([1, 1], [2, 3])).toThrow(/constant/i)
+  })
+
   it("fits linear and polynomial regression models", () => {
     const x = [0, 1, 2, 3, 4]
     const linear = fitRegression(
@@ -66,5 +73,12 @@ describe("statistics utilities", () => {
     expect(exponential.ok).toBe(true)
     expect(exponential.predict(4)).toBeCloseTo(32)
     expect(invalid.ok).toBe(false)
+  })
+
+  it("does not silently discard invalid or unpaired regression values", () => {
+    expect(fitRegression([1, 2], [3], "linear").ok).toBe(false)
+    expect(fitRegression([1, 2], [2, -1], "exponential").ok).toBe(false)
+    expect(fitRegression([1, 0], [2, 3], "logarithmic").ok).toBe(false)
+    expect(fitRegression([1, 2], [2, Number.NaN], "power").ok).toBe(false)
   })
 })

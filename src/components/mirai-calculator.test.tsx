@@ -18,6 +18,23 @@ describe("MiraiCalculator", () => {
     expect(screen.getByText("7×8")).toBeInTheDocument()
   })
 
+  it("inserts paired absolute-value bars and evaluates implicit multiplication", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator defaultTheme="light" />)
+
+    await user.click(screen.getByRole("button", { name: "6" }))
+    await user.click(screen.getByRole("button", { name: "Multiply" }))
+    await user.click(screen.getByRole("button", { name: "Absolute value" }))
+    await user.click(screen.getByRole("button", { name: "6" }))
+
+    expect(screen.getByLabelText("Calculator expression")).toHaveValue(
+      "6×|6|",
+    )
+
+    await user.click(screen.getByRole("button", { name: "Equals" }))
+    expect(screen.getAllByText("36")).toHaveLength(2)
+  })
+
   it("supports dark mode and toggles back to light", async () => {
     const user = userEvent.setup()
     const { container } = render(<MiraiCalculator defaultTheme="dark" />)

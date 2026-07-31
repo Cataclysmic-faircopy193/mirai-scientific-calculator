@@ -14,9 +14,10 @@ interface while exposing a reusable, typed package for any React application.
 - Vite, React, and TypeScript
 - Tailwind CSS v4 with shadcn/ui source components
 - ESM and CommonJS package outputs
+- Self-hosted Inter variable typography
 - Light, dark, and system theme support
 - Draggable, resizable, and fullscreen practice-player panel
-- 24 automated tests covering calculations and UI interactions
+- 140+ automated tests covering math rules, edge cases, and UI interactions
 
 ## Interface
 
