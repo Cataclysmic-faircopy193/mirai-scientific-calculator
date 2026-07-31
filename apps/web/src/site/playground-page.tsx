@@ -4,7 +4,6 @@ import {
   MiraiCalculator,
   type CalculatorExtension as CalculatorExtensionValue,
 } from "@/components/mirai-calculator/mirai-calculator"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -51,6 +50,11 @@ export function PlaygroundPage({
 }) {
   const extensions = parsePlaygroundExtensions(search.extensions)
   const activeMode = extensions.find((extension) => extension === search.mode) ?? extensions[0]
+  const activeExtensionLabel =
+    EXTENSIONS.find((extension) => extension.id === activeMode)?.label ?? activeMode
+  const calculatorThemeLabel =
+    CALCULATOR_THEME_OPTIONS.find((option) => option.value === search.calculatorTheme)?.label ??
+    search.calculatorTheme
   const snippet = createPlaygroundSnippet({
     extensions,
     mode: activeMode,
@@ -69,13 +73,11 @@ export function PlaygroundPage({
 
   return (
     <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8 lg:px-10">
-      <div className="flex flex-col gap-5 border-b pb-9 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-5 border-b pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Badge variant="outline" className="font-mono uppercase tracking-[0.16em]">
-            URL-synced configuration
-          </Badge>
-          <h1 className="mt-5 text-5xl font-semibold tracking-[-0.05em]">Playground</h1>
-          <p className="mt-4 max-w-2xl text-muted-foreground">
+          <p className="text-sm font-medium text-primary">URL-synced configuration</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.045em]">Playground</h1>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
             Select, order, and preview built-in extensions. Share the URL to reproduce the exact
             configuration.
           </p>
@@ -163,7 +165,9 @@ export function PlaygroundPage({
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="No extension enabled" />
+                    <SelectValue placeholder="No extension enabled">
+                      {activeExtensionLabel}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {extensions.map((extension) => (
@@ -185,7 +189,7 @@ export function PlaygroundPage({
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>{calculatorThemeLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {CALCULATOR_THEME_OPTIONS.map((option) => (

@@ -1,8 +1,6 @@
 export const SITE_NAME = "OpenMirai Calculator"
 export const SITE_DESCRIPTION =
-  "An editable shadcn calculator interface powered by a dependency-free mathematical core."
-export const SITE_DOMAIN = "calculator.openmirai.dev"
-export const SITE_URL = `https://${SITE_DOMAIN}`
+  "An editable scientific calculator installed through shadcn, backed by a small dependency-free mathematical core."
 export const GITHUB_URL = "https://github.com/openmirai/mirai-scientific-calculator"
 export const THEME_STORAGE_KEY = "mirai-calculator-site-theme"
 export const COMMAND_MENU_GROUPS = ["Explore", "Extensions", "Docs"] as const

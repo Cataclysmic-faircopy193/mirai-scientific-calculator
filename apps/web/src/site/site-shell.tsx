@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react"
 import { Link, Outlet, useRouterState } from "@tanstack/react-router"
-import { Menu, Moon, Search, Sun } from "lucide-react"
+import { Calculator, Menu, Moon, Search, Sun } from "lucide-react"
 import { siGithub } from "simple-icons"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -20,6 +19,7 @@ import {
   MOBILE_NAVIGATION,
   PAGE_TITLES,
   PRIMARY_NAVIGATION,
+  SITE_DESCRIPTION,
   SITE_NAME,
 } from "@/site/constants/site"
 import { CommandPalette } from "@/site/command-palette"
@@ -45,24 +45,16 @@ function ShellContent() {
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-5 md:px-8 lg:px-10">
+      <header className="sticky top-0 z-40 border-b bg-background/92 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-5 md:px-8 lg:px-10">
           <Link to="/" className="flex items-center gap-2.5" aria-label="OpenMirai Calculator home">
-            <span
-              aria-hidden="true"
-              className="grid size-7 place-items-center rounded-md border bg-foreground text-background shadow-sm"
-            >
-              <span className="size-2.5 rotate-45 border-2 border-current" />
+            <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground">
+              <Calculator className="size-4" />
             </span>
-            <span className="font-medium tracking-[-0.02em]">
-              OpenMirai <span className="text-muted-foreground">Calculator</span>
-            </span>
-            <Badge variant="secondary" className="font-mono text-[9px]">
-              v0.2
-            </Badge>
+            <span className="font-medium tracking-[-0.02em]">{SITE_NAME}</span>
           </Link>
 
-          <nav className="ml-6 hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+          <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Primary navigation">
             {PRIMARY_NAVIGATION.map((item) => (
               <Button
                 key={item.to}
@@ -81,13 +73,13 @@ function ShellContent() {
             <Button
               type="button"
               variant="outline"
-              className="hidden w-56 justify-start text-muted-foreground lg:flex"
+              className="hidden h-8 w-52 justify-start text-muted-foreground lg:flex"
               onClick={() => setCommandOpen(true)}
               aria-label="Search extensions and documentation"
             >
               <Search />
               <span>Search...</span>
-              <kbd className="ml-auto rounded border bg-muted px-1.5 font-mono text-[9px]">⌘K</kbd>
+              <kbd className="ml-auto rounded border bg-muted px-1.5 font-mono text-[10px]">⌘K</kbd>
             </Button>
             <Button
               variant="ghost"
@@ -151,14 +143,12 @@ function ShellContent() {
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-10 md:flex-row md:items-end md:justify-between md:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8 md:flex-row md:items-center md:justify-between md:px-8 lg:px-10">
           <div>
             <Link to="/" className="font-medium">
               {SITE_NAME}
             </Link>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              Editable calculator UI. Dependency-free mathematical core.
-            </p>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">{SITE_DESCRIPTION}</p>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
             {FOOTER_NAVIGATION.map((item) => (

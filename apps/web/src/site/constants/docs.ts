@@ -4,16 +4,13 @@ export const DOCS_NAVIGATION = [
 ] as const
 
 export const INSTALLATION_NOTES = [
-  "Copies the calculator, all four modes, scoped styles, and the embedded OpenMirai mark.",
+  "Copies the calculator, all four modes, and calculator-scoped styles.",
   "Adds the lightweight @openmirai/calculator-core package automatically.",
   "Uses your project’s configured shadcn style, including Base UI and Radix.",
   "Preserves host theme tokens and unrelated components.",
 ] as const
 
 export const INSTALL_COMMAND = "pnpm dlx shadcn@latest add @openmirai/calculator"
-
-export const AGENT_PROMPT =
-  "Install the OpenMirai calculator with `pnpm dlx shadcn@latest add @openmirai/calculator`, then render `MiraiCalculator` with the Scientific and Graphing extensions enabled. Preserve the host application's theme tokens."
 
 export const INSTALLATION_EXAMPLE = `import {
   CalculatorExtension,

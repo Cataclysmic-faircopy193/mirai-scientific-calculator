@@ -80,16 +80,18 @@ describe("MiraiCalculator extensions", () => {
     const user = userEvent.setup()
     const { unmount } = render(<MiraiCalculator extensions={[CalculatorExtension.STATISTICS]} />)
 
-    expect(screen.queryByRole("button", { name: "Degrees" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("combobox", { name: "Angle mode" })).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Calculator settings" }))
+    expect(screen.queryByRole("combobox", { name: "Angle mode" })).not.toBeInTheDocument()
     expect(screen.queryByText("Grid lines")).not.toBeInTheDocument()
     expect(screen.queryByLabelText("x min")).not.toBeInTheDocument()
 
     unmount()
     render(<MiraiCalculator extensions={[CalculatorExtension.GRAPHING]} />)
 
-    expect(screen.getByRole("button", { name: "Degrees" })).toBeInTheDocument()
+    expect(screen.queryByRole("combobox", { name: "Angle mode" })).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Calculator settings" }))
+    expect(screen.getByRole("combobox", { name: "Angle mode" })).toHaveTextContent("Degrees")
     expect(screen.getByText("Grid lines")).toBeInTheDocument()
     expect(screen.getByLabelText("x min")).toBeInTheDocument()
   })

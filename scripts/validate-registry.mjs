@@ -9,6 +9,7 @@ if (!calculator || calculator.type !== "registry:block") {
 }
 
 const expectedNpmDependencies = new Set([
+  "@fontsource-variable/inter@^5.3.0",
   "@openmirai/calculator-core@^0.2.0",
   "lucide-react@^1.28.0",
 ])
@@ -84,8 +85,23 @@ if (/(^|})\s*\.dark\s*{/m.test(css)) {
   throw new Error("Calculator registry CSS must not override the consumer dark theme")
 }
 
-if (/#[\da-f]{3,8}\b/i.test(css)) {
-  throw new Error("Calculator registry CSS must use consumer theme tokens")
+const baselineHexColors = new Set([
+  "#1a6f68",
+  "#27272a",
+  "#2a9d90",
+  "#71717a",
+  "#e4e4e7",
+  "#ef4444",
+  "#f0faf9",
+  "#f4f4f5",
+  "#ffffff",
+])
+const cssHexColors = new Set(css.match(/#[\da-f]{3,8}\b/gi)?.map((color) => color.toLowerCase()))
+
+for (const color of cssHexColors) {
+  if (!baselineHexColors.has(color)) {
+    throw new Error(`Calculator registry CSS contains a non-baseline color: ${color}`)
+  }
 }
 
 console.log(`Validated ${calculator.files.length} calculator registry files.`)

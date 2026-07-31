@@ -26,7 +26,7 @@ import {
 
 export function DocsLayout() {
   return (
-    <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:px-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-10">
+    <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:px-8 lg:grid-cols-[200px_minmax(0,1fr)] lg:px-10">
       <aside className="lg:sticky lg:top-24 lg:h-fit">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Documentation
@@ -55,11 +55,9 @@ export function DocsLayout() {
 export function InstallationPage() {
   return (
     <div>
-      <Badge variant="outline" className="font-mono uppercase tracking-[0.16em]">
-        Single-command install
-      </Badge>
-      <h1 className="mt-6 text-5xl font-semibold tracking-[-0.05em]">Installation</h1>
-      <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">
+      <Badge variant="secondary">Single-command install</Badge>
+      <h1 className="mt-5 text-4xl font-semibold tracking-[-0.045em]">Installation</h1>
+      <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
         The shadcn registry is the complete UI distribution. It installs editable source and brings
         the headless core with it, so consumers do not coordinate two setup flows.
       </p>
@@ -68,19 +66,19 @@ export function InstallationPage() {
         <CodeBlock code={INSTALL_COMMAND} label="Terminal" language="shell" />
       </div>
 
-      <div className="mt-8 grid gap-3">
+      <ul className="mt-8 grid gap-3">
         {INSTALLATION_NOTES.map((note) => (
-          <div key={note} className="flex gap-3 rounded-lg border bg-card p-4 text-sm">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-cyan-600 dark:text-cyan-300" />
+          <li key={note} className="flex gap-3 text-sm">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
             {note}
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <Separator className="my-12" />
 
       <section>
-        <h2 className="text-3xl font-semibold tracking-[-0.035em]">Choose built-in extensions</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.03em]">Choose built-in extensions</h2>
         <p className="mt-4 leading-7 text-muted-foreground">
           Use uppercase enum-like constants. The array controls availability and order; no
           additional extension package is installed.
@@ -95,7 +93,7 @@ export function InstallationPage() {
       <div className="grid gap-5 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <Shapes className="mb-3 size-5 text-cyan-600 dark:text-cyan-300" />
+            <Shapes className="mb-3 size-5 text-primary" />
             <CardTitle>Editable UI</CardTitle>
             <CardDescription>
               Change layout, controls, and styling inside your own component directory.
@@ -104,7 +102,7 @@ export function InstallationPage() {
         </Card>
         <Card>
           <CardHeader>
-            <PackageOpen className="mb-3 size-5 text-cyan-600 dark:text-cyan-300" />
+            <PackageOpen className="mb-3 size-5 text-primary" />
             <CardTitle>Stable calculations</CardTitle>
             <CardDescription>
               Keep calculation behavior in the small core dependency installed by the registry.
@@ -119,14 +117,12 @@ export function InstallationPage() {
 export function CorePage() {
   return (
     <div>
-      <Badge variant="outline" className="font-mono uppercase tracking-[0.16em]">
-        Framework-independent
-      </Badge>
-      <h1 className="mt-6 text-5xl font-semibold tracking-[-0.05em]">Headless core</h1>
-      <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">
-        `@openmirai/calculator-core` contains calculation utilities only: no React, no DOM, and no
-        stylesheet. The shadcn item adds it automatically, while advanced consumers can use it
-        directly.
+      <Badge variant="secondary">Framework-independent</Badge>
+      <h1 className="mt-5 text-4xl font-semibold tracking-[-0.045em]">Headless core</h1>
+      <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
+        <code className="font-mono text-base text-foreground">@openmirai/calculator-core</code>{" "}
+        contains calculation utilities only: no React, no DOM, and no stylesheet. The shadcn item
+        adds it automatically, while advanced consumers can use it directly.
       </p>
 
       <div className="mt-10">
@@ -139,7 +135,7 @@ export function CorePage() {
       <Separator className="my-12" />
 
       <section>
-        <h2 className="text-3xl font-semibold tracking-[-0.035em]">Subpath exports</h2>
+        <h2 className="text-2xl font-semibold tracking-[-0.03em]">Subpath exports</h2>
         <p className="mt-4 text-muted-foreground">
           Import only the subsystem you need. Each export is available in ESM, CommonJS, and
           TypeScript declaration formats.

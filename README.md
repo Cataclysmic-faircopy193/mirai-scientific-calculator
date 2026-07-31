@@ -69,9 +69,10 @@ The registry item copies the calculator into
 installs `@openmirai/calculator-core`. The copied component owns its styles, so
 there is no separate UI package or stylesheet package to install.
 
-The OpenMirai wordmark is embedded directly in the calculator header and is
-always rendered, including when `extensions={[]}`. The supported component API
-does not expose a branding toggle or external logo asset.
+The calculator preserves the visual baseline from `v0.1.6`; the registry does
+not add package-specific branding to the calculator chrome. The OpenMirai
+wordmark remains embedded in the practice backdrop without an external logo
+asset or branding toggle.
 
 The registry supports projects initialized with Base UI or Radix without
 replacing unrelated components or global theme variables.
@@ -123,7 +124,7 @@ minimum while remaining bounded by the backdrop.
 
 ### Controlled state
 
-Mode, angle mode, and theme can each be controlled or uncontrolled.
+Mode, angle mode, theme, and visibility can each be controlled or uncontrolled.
 
 ```tsx
 import { useState } from "react"
@@ -145,6 +146,7 @@ export function ControlledCalculator() {
       theme={theme}
       onThemeChange={setTheme}
       angleMode="degrees"
+      hidden={false}
     />
   )
 }
@@ -167,6 +169,9 @@ export function ControlledCalculator() {
 | `theme`             | `"light" \| "dark" \| "system"`  |              — | Controlled color theme                              |
 | `defaultTheme`      | `"light" \| "dark" \| "system"`  |      `"light"` | Initial uncontrolled theme                          |
 | `onThemeChange`     | `(theme) => void`                |              — | Called after the theme changes                      |
+| `hidden`            | `boolean`                        |              — | Controlled hidden state                             |
+| `defaultHidden`     | `boolean`                        |        `false` | Initial uncontrolled hidden state                   |
+| `onHiddenChange`    | `(hidden) => void`               |              — | Called after the hidden state changes               |
 | `startFullscreen`   | `boolean`                        |        `false` | Opens the panel in fullscreen mode                  |
 | `showBackdrop`      | `boolean`                        |        `false` | Enables the practice backdrop and panel drag/resize |
 | `title`             | `string`                         | `"Calculator"` | Accessible panel title                              |

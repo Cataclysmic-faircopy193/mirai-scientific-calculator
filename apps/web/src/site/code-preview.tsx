@@ -4,6 +4,7 @@ import { Code2, Eye } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CopyButton } from "@/site/copy-button"
+import { HighlightedCode } from "@/site/highlighted-code"
 
 const PREVIEW_TAB = "preview"
 const CODE_TAB = "code"
@@ -36,9 +37,12 @@ export function CodePreview({
             <div className="bg-muted/20 p-3 sm:p-6">{preview}</div>
           </TabsContent>
           <TabsContent value={CODE_TAB} aria-label={`${previewLabel} code`}>
-            <pre className="max-h-[640px] overflow-auto bg-slate-950 p-5 text-sm leading-7 text-slate-100">
-              <code>{code}</code>
-            </pre>
+            <HighlightedCode
+              ariaLabel={`${previewLabel} source code`}
+              className="max-h-[640px]"
+              code={code}
+              language="tsx"
+            />
           </TabsContent>
         </CardContent>
       </Card>

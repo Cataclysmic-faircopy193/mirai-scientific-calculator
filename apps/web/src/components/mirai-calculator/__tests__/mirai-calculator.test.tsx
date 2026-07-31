@@ -5,10 +5,16 @@ import { describe, expect, it, vi } from "vitest"
 import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 
 describe("MiraiCalculator", () => {
-  it("always renders the embedded OpenMirai mark", () => {
+  it("keeps package branding out of the calculator chrome", () => {
     render(<MiraiCalculator extensions={[]} />)
 
-    expect(screen.getByRole("img", { name: "OpenMirai" })).toBeInTheDocument()
+    expect(screen.queryByRole("img", { name: "OpenMirai" })).not.toBeInTheDocument()
+  })
+
+  it("renders the OpenMirai mark only in the practice backdrop", () => {
+    const { container } = render(<MiraiCalculator showBackdrop />)
+
+    expect(container.querySelector('svg[aria-label="OpenMirai"]')).toBeInTheDocument()
   })
 
   it("evaluates an expression from the scientific keypad", async () => {

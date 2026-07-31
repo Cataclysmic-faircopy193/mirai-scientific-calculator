@@ -3,52 +3,46 @@ import { ArrowRight } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ExtensionVisual } from "@/site/extension-visual"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { EXTENSIONS } from "@/site/site-data"
 
 export function ExtensionsPage() {
   return (
-    <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 lg:px-10">
+    <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 lg:px-10 lg:py-20">
       <div className="max-w-3xl">
-        <Badge variant="outline" className="font-mono uppercase tracking-[0.16em]">
-          Built-in functionality
-        </Badge>
-        <h1 className="mt-6 text-5xl font-semibold tracking-[-0.05em] sm:text-6xl">
-          Configure a calculator around the work.
+        <Badge variant="secondary">Built-in extensions</Badge>
+        <h1 className="mt-5 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
+          Choose the calculator workspaces your product needs.
         </h1>
-        <p className="mt-6 text-lg leading-8 text-muted-foreground">
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">
           The registry installs every workspace once. The uppercase `CalculatorExtension` constants
           decide which instruments appear, their order, and the active mode.
         </p>
       </div>
 
-      <div className="mt-14 grid gap-5 md:grid-cols-2">
+      <div className="mt-10 grid gap-4 md:grid-cols-2">
         {EXTENSIONS.map((extension) => (
-          <Card key={extension.id} className="group">
+          <Card key={extension.id}>
             <CardHeader>
-              <div className="mb-5 grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <div className="mb-4 grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <extension.icon className="size-4" />
               </div>
-              <CardDescription className="font-mono text-xs uppercase tracking-[0.15em]">
+              <CardDescription className="text-xs font-medium text-primary">
                 {extension.eyebrow}
               </CardDescription>
-              <CardTitle className="text-3xl tracking-[-0.04em]">{extension.label}</CardTitle>
+              <CardTitle className="text-2xl tracking-[-0.03em]">{extension.label}</CardTitle>
               <CardDescription className="max-w-xl leading-6">
                 {extension.description}
               </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ExtensionVisual extension={extension.id} />
               <Button
                 variant="link"
                 nativeButton={false}
-                className="mt-4 px-0"
+                className="mt-3 w-fit px-0"
                 render={<Link to="/extensions/$id" params={{ id: extension.id }} />}
               >
                 Open extension <ArrowRight />
               </Button>
-            </CardContent>
+            </CardHeader>
           </Card>
         ))}
       </div>

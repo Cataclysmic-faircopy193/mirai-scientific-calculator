@@ -20,9 +20,12 @@ import {
 } from "lucide-react"
 
 import {
+  ANGLE_MODE_LABELS,
   DECIMAL_OPTIONS,
   GRAPH_BOUNDARY_KEYS,
+  NOTATION_LABELS,
   PRACTICE_ANSWERS,
+  THEME_LABELS,
 } from "@/components/mirai-calculator/calculator-constants"
 import { GraphingMode } from "@/components/mirai-calculator/modes/graphing-mode"
 import { ScientificMode } from "@/components/mirai-calculator/modes/scientific-mode"
@@ -893,7 +896,7 @@ export function MiraiCalculator({
                         className="w-28 bg-background"
                         aria-label="Angle mode"
                       >
-                        <SelectValue />
+                        <SelectValue>{ANGLE_MODE_LABELS[activeAngleMode]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent
                         className={cn(
@@ -923,7 +926,7 @@ export function MiraiCalculator({
                     }}
                   >
                     <SelectTrigger size="sm" className="w-32 bg-background">
-                      <SelectValue />
+                      <SelectValue>{NOTATION_LABELS[displaySettings.notation]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent
                       className={cn(
@@ -952,7 +955,11 @@ export function MiraiCalculator({
                     }}
                   >
                     <SelectTrigger size="sm" className="w-24 bg-background">
-                      <SelectValue />
+                      <SelectValue>
+                        {displaySettings.decimals === "auto"
+                          ? "Auto"
+                          : String(displaySettings.decimals)}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent
                       className={cn(
@@ -1042,7 +1049,7 @@ export function MiraiCalculator({
                     }}
                   >
                     <SelectTrigger size="sm" className="w-28 bg-background">
-                      <SelectValue />
+                      <SelectValue>{THEME_LABELS[activeTheme]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent
                       className={cn(
