@@ -4,6 +4,7 @@ import { Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+/** Copies provided text and announces the temporary copied state. */
 export function CopyButton({
   value,
   label = "Copy",

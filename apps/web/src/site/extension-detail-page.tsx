@@ -7,6 +7,7 @@ import { CodePreview } from "@/site/code-preview"
 import { NotFoundPage } from "@/site/not-found-page"
 import { getExtension } from "@/site/site-data"
 
+/** Renders one focused calculator extension example or the not-found state. */
 export function ExtensionDetailPage({ extensionId }: { extensionId: string }) {
   const extension = getExtension(extensionId)
 
@@ -45,13 +46,14 @@ export function ExtensionDetailPage({ extensionId }: { extensionId: string }) {
 
         <CodePreview
           preview={
-            <MiraiCalculator
-              extensions={[extension.id]}
-              defaultMode={extension.id}
-              height={670}
-              defaultTheme="system"
-              title={`${extension.label} calculator`}
-            />
+            <div className="h-[670px]">
+              <MiraiCalculator
+                extensions={[extension.id]}
+                defaultMode={extension.id}
+                defaultTheme="system"
+                title={`${extension.label} calculator`}
+              />
+            </div>
           }
           code={extension.example}
           previewLabel={extension.label}

@@ -24,6 +24,7 @@ import {
   INSTALLATION_NOTES,
 } from "@/site/constants/docs"
 
+/** Renders the shared documentation navigation and nested route outlet. */
 export function DocsLayout() {
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:px-8 lg:grid-cols-[200px_minmax(0,1fr)] lg:px-10">
@@ -52,6 +53,7 @@ export function DocsLayout() {
   )
 }
 
+/** Documents registry installation and initial calculator composition. */
 export function InstallationPage() {
   return (
     <div>
@@ -114,6 +116,7 @@ export function InstallationPage() {
   )
 }
 
+/** Documents the headless calculator-core package and its module boundaries. */
 export function CorePage() {
   return (
     <div>

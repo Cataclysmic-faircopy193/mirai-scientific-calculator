@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
+/** Renders the site-level not-found recovery page. */
 export function NotFoundPage() {
   return (
     <div className="mx-auto grid min-h-[70vh] max-w-7xl place-items-center px-5 py-20 text-center">

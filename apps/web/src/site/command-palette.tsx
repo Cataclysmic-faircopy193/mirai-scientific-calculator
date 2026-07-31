@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { ArrowRight, Search } from "lucide-react"
 
@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { COMMAND_MENU_GROUPS } from "@/site/constants/site"
 import { SITE_ROUTES } from "@/site/site-data"
 
+/** Provides searchable keyboard navigation across showcase pages and extensions. */
 export function CommandPalette({
   open,
   onOpenChange,
@@ -24,17 +25,18 @@ export function CommandPalette({
   onOpenChange: (open: boolean) => void
 }) {
   const [query, setQuery] = useState("")
+  const toggleOpen = useEffectEvent(() => onOpenChange(!open))
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault()
-        onOpenChange(!open)
+        toggleOpen()
       }
     }
     window.addEventListener("keydown", handleKeyboard)
     return () => window.removeEventListener("keydown", handleKeyboard)
-  }, [onOpenChange, open])
+  }, [])
 
   const filteredRoutes = useMemo(() => {
     const normalized = query.trim().toLowerCase()

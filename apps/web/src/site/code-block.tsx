@@ -3,6 +3,7 @@ import { CODE_LANGUAGE_LABELS, type CodeLanguage } from "@/site/constants/code"
 import { CopyButton } from "@/site/copy-button"
 import { HighlightedCode } from "@/site/highlighted-code"
 
+/** Renders highlighted source with a copy affordance. */
 export function CodeBlock({
   code,
   label,

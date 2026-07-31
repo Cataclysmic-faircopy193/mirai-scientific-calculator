@@ -39,6 +39,34 @@ function stableMidpoint(left: number, right: number): number {
   return Number.isFinite(sum) ? sum / 2 : left / 2 + right / 2
 }
 
+/** Parses a calculator tool input while tolerating visual thousands separators. */
+export function parseToolNumber(value: string, fallback = 0): number {
+  const result = Number(value.replace(/,/g, ""))
+  return Number.isFinite(result) ? result : fallback
+}
+
+/** Initial editable values for the math-tools workspace. */
+export interface ToolsInitialData {
+  percent?: number | string
+  percentOf?: number | string
+  ratioLeft?: number | string
+  ratioRight?: number | string
+  ratioScale?: number | string
+  x1?: number | string
+  y1?: number | string
+  x2?: number | string
+  y2?: number | string
+  radius?: number | string
+  base?: number | string
+  height?: number | string
+  depth?: number | string
+}
+
+/** Serializes an optional initial tool value for an editable input. */
+export function serializeToolValue(value: number | string | undefined): string {
+  return value === undefined ? "" : String(value)
+}
+
 export interface PercentResults {
   portion: number
   increased: number
@@ -46,6 +74,7 @@ export interface PercentResults {
   originalBeforeIncrease: number
 }
 
+/** Calculates common percentage transformations for a finite percentage and value. */
 export function calculatePercent(percent: number, value: number): PercentResults {
   requireFinite([percent, value])
   const rate = percent / 100
@@ -67,6 +96,7 @@ export interface RatioResults {
   lcm: number
 }
 
+/** Reduces a ratio and scales both sides by a finite multiplier. */
 export function calculateRatio(left: number, right: number, scale: number): RatioResults {
   requireFinite([left, right, scale])
   const leftDecimal = decimalInteger(left)
@@ -102,6 +132,7 @@ export interface CoordinateResults {
   intercept: number | null
 }
 
+/** Calculates distance, midpoint, and slope for two Cartesian points. */
 export function calculateCoordinates(
   x1: number,
   y1: number,
@@ -140,6 +171,7 @@ export interface ShapeResults {
   prismVolume: number
 }
 
+/** Calculates area, circumference, and volume measurements for supported shapes. */
 export function calculateShapes(
   radius: number,
   base: number,

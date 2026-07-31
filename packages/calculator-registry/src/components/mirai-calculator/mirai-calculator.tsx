@@ -1,35 +1,35 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
+  useSyncExternalStore,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import {
   Calculator as CalculatorIcon,
   Expand,
   EyeOff,
   Minimize2,
   Moon,
+  RotateCcw,
   Settings2,
   Sun,
   X,
 } from "lucide-react"
 
 import {
-  ANGLE_MODE_LABELS,
-  DECIMAL_OPTIONS,
-  GRAPH_BOUNDARY_KEYS,
-  NOTATION_LABELS,
-  PRACTICE_ANSWERS,
-  THEME_LABELS,
-} from "@/components/mirai-calculator/calculator-constants"
-import { GraphingMode } from "@/components/mirai-calculator/modes/graphing-mode"
+  GraphingMode,
+  type GraphingInitialData,
+} from "@/components/mirai-calculator/modes/graphing-mode"
 import { ScientificMode } from "@/components/mirai-calculator/modes/scientific-mode"
-import { StatisticsMode } from "@/components/mirai-calculator/modes/statistics-mode"
+import {
+  StatisticsMode,
+  type StatisticsInitialData,
+} from "@/components/mirai-calculator/modes/statistics-mode"
 import { ToolsMode } from "@/components/mirai-calculator/modes/tools-mode"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,35 +40,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  ANGLE_MODE_LABELS,
+  CalculatorExtension as CoreCalculatorExtension,
+  DECIMAL_OPTIONS,
+  DEFAULT_DISPLAY_SETTINGS,
+  DEFAULT_GRAPH_VIEW,
+  EMPTY_CALCULATOR_DEFINITIONS,
+  GRAPH_BOUNDARY_KEYS,
+  NOTATION_LABELS,
+  THEME_LABELS,
+  calculatorNumberFormatOptions,
+  collectSliderVariables,
+  normalizeCalculatorExtensions,
+  type CalculatorDisplaySettings,
+  type CalculatorExtension as CalculatorExtensionValue,
+  type CalculatorMode,
+  type CalculatorTheme,
+} from "@openmirai/calculator-core/configuration"
 import {
   CalculatorEngine,
   type AngleMode,
   type NumberFormatOptions,
 } from "@openmirai/calculator-core/engine"
 import type { GraphView } from "@openmirai/calculator-core/graphing"
+import type { ToolsInitialData as ToolsInitialDataValue } from "@openmirai/calculator-core/tools"
 import { cn } from "@/lib/utils"
 
-import "./mirai-calculator.css"
-
-// oxlint-disable-next-line react/only-export-components -- This constant is part of the component's public API.
-export const CalculatorExtension = {
-  SCIENTIFIC: "scientific",
-  GRAPHING: "graphing",
-  STATISTICS: "statistics",
-  TOOLS: "tools",
-} as const
-
-export type CalculatorExtension = (typeof CalculatorExtension)[keyof typeof CalculatorExtension]
-export type CalculatorMode = CalculatorExtension
-export type CalculatorTheme = "light" | "dark" | "system"
+/** Identifies an installable calculator workspace. */
+export const CalculatorExtension = CoreCalculatorExtension
+export type { CalculatorMode, CalculatorTheme }
+export type CalculatorExtension = CalculatorExtensionValue
+export type {
+  GraphingExpressionInitialValue,
+  GraphingInitialData,
+  GraphingSliderInitialValue,
+  GraphingTableInitialValue,
+  GraphingTableSeriesInitialValue,
+} from "@/components/mirai-calculator/modes/graphing-mode"
+export type { StatisticsInitialData } from "@/components/mirai-calculator/modes/statistics-mode"
+export type { ToolsInitialData } from "@openmirai/calculator-core/tools"
 
 export interface MiraiCalculatorProps {
   className?: string
-  style?: CSSProperties
-  height?: number | string
   extensions?: readonly CalculatorExtension[]
   mode?: CalculatorMode
   defaultMode?: CalculatorMode
@@ -83,23 +99,12 @@ export interface MiraiCalculatorProps {
   defaultHidden?: boolean
   onHiddenChange?: (hidden: boolean) => void
   startFullscreen?: boolean
-  showBackdrop?: boolean
   title?: string
   onClose?: () => void
-}
-
-interface DisplaySettings {
-  notation: "auto" | "scientific"
-  decimals: number | "auto"
-  significantFigures: number
-  thousandsSeparator: boolean
-}
-
-interface PanelGeometry {
-  x: number
-  y: number
-  width: number
-  height: number
+  defaultDefinitions?: readonly string[]
+  defaultGraphingData?: GraphingInitialData
+  defaultStatisticsData?: StatisticsInitialData
+  defaultToolsData?: ToolsInitialDataValue
 }
 
 interface ModeRendererProps {
@@ -118,85 +123,23 @@ interface ModeRendererProps {
   graphGridVisible: boolean
   setGraphGridVisible: (visible: boolean) => void
   resolvedTheme: "light" | "dark"
+  defaultGraphingData?: GraphingInitialData
+  defaultStatisticsData?: StatisticsInitialData
+  defaultToolsData?: ToolsInitialDataValue
 }
 
 interface ExtensionDefinition {
   label: string
+  compactLabel: string
   usesAngleMode: boolean
   hasGraphSettings: boolean
   render: (props: ModeRendererProps) => ReactNode
 }
 
-const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
-  notation: "auto",
-  decimals: "auto",
-  significantFigures: 12,
-  thousandsSeparator: true,
-}
-const DEFAULT_GRAPH_VIEW: GraphView = {
-  xmin: -8,
-  xmax: 8,
-  ymin: -5,
-  ymax: 7,
-}
-const DEFAULT_DEFINITIONS = ["f(x) = 2x + 5", "g(x) = x² − 3x + 2"]
-const MIN_PANEL_WIDTH = 720
-const MIN_PANEL_HEIGHT = 460
-const PORTAL_THEME_PROPERTIES = [
-  "--radius",
-  "--background",
-  "--foreground",
-  "--card",
-  "--card-foreground",
-  "--popover",
-  "--popover-foreground",
-  "--primary",
-  "--primary-foreground",
-  "--secondary",
-  "--secondary-foreground",
-  "--muted",
-  "--muted-foreground",
-  "--accent",
-  "--accent-foreground",
-  "--destructive",
-  "--border",
-  "--input",
-  "--ring",
-  "--chart-1",
-  "--chart-2",
-  "--chart-3",
-  "--chart-4",
-  "--chart-5",
-  "--mirai-radius",
-  "--mirai-background",
-  "--mirai-foreground",
-  "--mirai-card",
-  "--mirai-card-foreground",
-  "--mirai-popover",
-  "--mirai-popover-foreground",
-  "--mirai-primary",
-  "--mirai-primary-foreground",
-  "--mirai-secondary",
-  "--mirai-secondary-foreground",
-  "--mirai-muted",
-  "--mirai-muted-foreground",
-  "--mirai-accent",
-  "--mirai-accent-foreground",
-  "--mirai-destructive",
-  "--mirai-border",
-  "--mirai-input",
-  "--mirai-ring",
-  "--mirai-chart-1",
-  "--mirai-chart-2",
-  "--mirai-chart-3",
-  "--mirai-chart-4",
-  "--mirai-chart-5",
-] as const
-
-const ALL_EXTENSIONS = Object.values(CalculatorExtension)
 const EXTENSION_DEFINITIONS: Record<CalculatorExtension, ExtensionDefinition> = {
   [CalculatorExtension.SCIENTIFIC]: {
     label: "Scientific",
+    compactLabel: "Sci",
     usesAngleMode: true,
     hasGraphSettings: false,
     render: ({ resetSignal, engine, definitions, setDefinitions, setAns, formatOptions }) => (
@@ -212,6 +155,7 @@ const EXTENSION_DEFINITIONS: Record<CalculatorExtension, ExtensionDefinition> = 
   },
   [CalculatorExtension.GRAPHING]: {
     label: "Graphing",
+    compactLabel: "Graph",
     usesAngleMode: true,
     hasGraphSettings: true,
     render: ({
@@ -226,6 +170,7 @@ const EXTENSION_DEFINITIONS: Record<CalculatorExtension, ExtensionDefinition> = 
       graphGridVisible,
       setGraphGridVisible,
       resolvedTheme,
+      defaultGraphingData,
     }) => (
       <GraphingMode
         key={`graphing-${resetSignal}`}
@@ -239,41 +184,55 @@ const EXTENSION_DEFINITIONS: Record<CalculatorExtension, ExtensionDefinition> = 
         gridVisible={graphGridVisible}
         onGridVisibleChange={setGraphGridVisible}
         colorScheme={resolvedTheme}
+        defaultData={defaultGraphingData}
       />
     ),
   },
   [CalculatorExtension.STATISTICS]: {
     label: "Stats",
+    compactLabel: "Stats",
     usesAngleMode: false,
     hasGraphSettings: false,
-    render: ({ resetSignal, formatNumber, resolvedTheme }) => (
+    render: ({ resetSignal, formatNumber, resolvedTheme, defaultStatisticsData }) => (
       <StatisticsMode
         key={`statistics-${resetSignal}`}
         formatNumber={formatNumber}
         colorScheme={resolvedTheme}
+        defaultData={defaultStatisticsData}
       />
     ),
   },
   [CalculatorExtension.TOOLS]: {
     label: "Tools",
+    compactLabel: "Tools",
     usesAngleMode: false,
     hasGraphSettings: false,
-    render: ({ resetSignal, formatNumber }) => (
-      <ToolsMode key={`tools-${resetSignal}`} formatNumber={formatNumber} />
+    render: ({ resetSignal, formatNumber, defaultToolsData }) => (
+      <ToolsMode
+        key={`tools-${resetSignal}`}
+        formatNumber={formatNumber}
+        defaultData={defaultToolsData}
+      />
     ),
   },
 }
 
-function normalizeExtensions(
-  extensions: readonly CalculatorExtension[] | undefined
-): CalculatorExtension[] {
-  if (extensions === undefined || !Array.isArray(extensions)) return [...ALL_EXTENSIONS]
-
-  const supportedExtensions = new Set<unknown>(ALL_EXTENSIONS)
-  return [...new Set(extensions.filter((extension) => supportedExtensions.has(extension)))]
+function subscribeToSystemTheme(onStoreChange: () => void): () => void {
+  const query = window.matchMedia("(prefers-color-scheme: dark)")
+  query.addEventListener("change", onStoreChange)
+  return () => query.removeEventListener("change", onStoreChange)
 }
 
-function OpenMiraiLogo() {
+function getSystemThemeSnapshot(): boolean {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+
+function getServerSystemThemeSnapshot(): boolean {
+  return false
+}
+
+/** Renders the non-optional OpenMirai wordmark embedded in the calculator chrome. */
+export function OpenMiraiLogo() {
   return (
     <svg
       aria-label="OpenMirai"
@@ -307,7 +266,7 @@ function OpenMiraiLogo() {
         fill="currentColor"
       />
       <path
-        d="M254.11 32.6719H258.103V55.4567H254.11V32.6719ZM256.108 28.287C255.332 28.287 254.679 28.029 254.153 27.5132C253.655 26.9972 253.404 26.3666 253.404 25.6215C253.404 24.8764 253.655 24.2459 254.153 23.7299C254.679 23.1854 255.332 22.9131 256.108 22.9131C256.883 22.9131 257.522 23.1711 258.021 23.6871C258.546 24.1742 258.811 24.7904 258.811 25.5355C258.811 26.3095 258.546 26.9685 258.021 27.5132C257.522 28.029 256.883 28.287Z"
+        d="M254.11 32.6719H258.103V55.4567H254.11V32.6719ZM256.108 28.287C255.332 28.287 254.679 28.029 254.153 27.5132C253.655 26.9972 253.404 26.3666 253.404 25.6215C253.404 24.8764 253.655 24.2459 254.153 23.7299C254.679 23.1854 255.332 22.9131 256.108 22.9131C256.883 22.9131 257.522 23.1711 258.021 23.6871C258.546 24.1742 258.811 24.7904 258.811 25.5355C258.811 26.3095 258.546 26.9685 258.021 27.5132C257.522 28.029 256.883 28.287 256.108 28.287Z"
         fill="currentColor"
       />
       <path
@@ -319,7 +278,7 @@ function OpenMiraiLogo() {
         fill="currentColor"
       />
       <path
-        d="M307.304 32.6719H311.296V55.4567H307.304V32.6719ZM309.299 28.287C308.523 28.287 307.872 28.029 307.345 27.5132C306.846 26.9972 306.596 26.3666 306.596 25.6215C306.596 24.8764 306.846 24.2459 307.345 23.7299C307.872 23.1854 308.523 22.9131 309.299 22.9131C310.075 22.9131 310.713 23.1711 311.212 23.6871C311.74 24.1742 312.002 24.7904 312.002 25.5355C312.002 26.3095 311.74 26.9685 311.212 27.5132C310.713 28.029 310.075 28.287Z"
+        d="M307.304 32.6719H311.296V55.4567H307.304V32.6719ZM309.299 28.287C308.523 28.287 307.872 28.029 307.345 27.5132C306.846 26.9972 306.596 26.3666 306.596 25.6215C306.596 24.8764 306.846 24.2459 307.345 23.7299C307.872 23.1854 308.523 22.9131 309.299 22.9131C310.075 22.9131 310.713 23.1711 311.212 23.6871C311.74 24.1742 312.002 24.7904 312.002 25.5355C312.002 26.3095 311.74 26.9685 311.212 27.5132C310.713 28.029 310.075 28.287 309.299 28.287Z"
         fill="currentColor"
       />
       <path
@@ -342,35 +301,46 @@ function OpenMiraiLogo() {
   )
 }
 
-function PracticeBackdrop() {
+function CalculatorViewportPortal({
+  fullscreen,
+  children,
+}: {
+  fullscreen: boolean
+  children: ReactNode
+}) {
+  const inlineContainerRef = useRef<HTMLDivElement>(null)
+  const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null)
+
+  useLayoutEffect(() => {
+    const host = document.createElement("div")
+    host.style.display = "contents"
+    setPortalHost(host)
+    return () => host.remove()
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!portalHost) return
+    const target = fullscreen ? document.body : inlineContainerRef.current
+    target?.append(portalHost)
+  }, [fullscreen, portalHost])
+
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 flex flex-col overflow-hidden bg-zinc-100 text-zinc-950"
-    >
-      <div className="flex h-14 items-center border-b border-zinc-200 bg-white px-6">
-        <OpenMiraiLogo />
-        <span className="ml-auto font-mono text-sm font-semibold">21:47</span>
-      </div>
-      <div className="grid flex-1 grid-cols-2 opacity-45">
-        <div className="border-r border-zinc-200 p-12 text-base leading-7">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Question 14 of 22
-          </p>
-          The function h is defined by h(x) = x² − 5x + 6. For what values of x does the graph of h
-          cross the x-axis?
-        </div>
-        <div className="space-y-3 p-12">
-          {PRACTICE_ANSWERS.map((answer, index) => (
-            <div
-              key={answer}
-              className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm"
-            >
-              {String.fromCharCode(65 + index)}. {answer}
-            </div>
-          ))}
-        </div>
-      </div>
+    <div ref={inlineContainerRef} style={{ display: "contents" }}>
+      {portalHost
+        ? createPortal(
+            <>
+              {fullscreen && (
+                <div
+                  aria-hidden="true"
+                  data-mirai-fullscreen-guard=""
+                  className="fixed inset-0 z-[2147482999] bg-black/35 backdrop-blur-[1px]"
+                />
+              )}
+              {children}
+            </>,
+            portalHost
+          )
+        : children}
     </div>
   )
 }
@@ -380,13 +350,11 @@ function HeaderIconButton({
   children,
   onClick,
   portalTheme,
-  portalThemeStyle,
 }: {
   label: string
   children: ReactNode
   onClick: () => void
   portalTheme: "light" | "dark"
-  portalThemeStyle: CSSProperties
 }) {
   return (
     <Tooltip>
@@ -402,11 +370,10 @@ function HeaderIconButton({
       </TooltipTrigger>
       <TooltipContent
         className={cn(
-          "mirai-calculator-package mirai-calculator-portal",
-          portalTheme === "dark" && "dark"
+          "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+          portalTheme
         )}
         data-theme={portalTheme}
-        style={portalThemeStyle}
       >
         {label}
       </TooltipContent>
@@ -414,10 +381,9 @@ function HeaderIconButton({
   )
 }
 
+/** Composes enabled calculator extensions into a configurable, container-responsive panel. */
 export function MiraiCalculator({
   className,
-  style,
-  height = 660,
   extensions,
   mode,
   defaultMode = CalculatorExtension.SCIENTIFIC,
@@ -432,49 +398,43 @@ export function MiraiCalculator({
   defaultHidden = false,
   onHiddenChange,
   startFullscreen = false,
-  showBackdrop = false,
   title = "Calculator",
   onClose,
+  defaultDefinitions = EMPTY_CALCULATOR_DEFINITIONS,
+  defaultGraphingData,
+  defaultStatisticsData,
+  defaultToolsData,
 }: MiraiCalculatorProps) {
   const [internalMode, setInternalMode] = useState(defaultMode)
   const [internalAngleMode, setInternalAngleMode] = useState(defaultAngleMode)
   const [internalTheme, setInternalTheme] = useState(defaultTheme)
   const [internalHidden, setInternalHidden] = useState(defaultHidden)
-  const [systemDark, setSystemDark] = useState(() =>
-    typeof window === "undefined"
-      ? false
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
+  const systemDark = useSyncExternalStore(
+    subscribeToSystemTheme,
+    getSystemThemeSnapshot,
+    getServerSystemThemeSnapshot
   )
   const [fullscreen, setFullscreen] = useState(startFullscreen)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [portalThemeStyle, setPortalThemeStyle] = useState<CSSProperties>({})
-  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(DEFAULT_DISPLAY_SETTINGS)
-  const [graphView, setGraphView] = useState<GraphView>(DEFAULT_GRAPH_VIEW)
+  const [displaySettings, setDisplaySettings] = useState<CalculatorDisplaySettings>(() => ({
+    ...DEFAULT_DISPLAY_SETTINGS,
+  }))
+  const [graphView, setGraphView] = useState<GraphView>(() => ({ ...DEFAULT_GRAPH_VIEW }))
   const [graphGridVisible, setGraphGridVisible] = useState(true)
-  const [definitions, setDefinitions] = useState(DEFAULT_DEFINITIONS)
-  const [variables, setVariables] = useState<Record<string, number>>({})
+  const [definitions, setDefinitions] = useState(() => [...defaultDefinitions])
+  const [variables, setVariables] = useState<Record<string, number>>(() =>
+    collectSliderVariables(
+      (defaultGraphingData?.expressions ?? []).map((expression) => ({
+        expression: expression.value,
+        value: expression.slider?.value,
+      }))
+    )
+  )
   const [ans, setAns] = useState(0)
   const [resetSignal, setResetSignal] = useState(0)
-  const [panelGeometry, setPanelGeometry] = useState<PanelGeometry>(() => ({
-    x: 72,
-    y: 92,
-    width: 1040,
-    height: typeof height === "number" ? height : Number.parseFloat(String(height)) || 660,
-  }))
-  const backdropRef = useRef<HTMLDivElement>(null)
   const calculatorRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{
-    startX: number
-    startY: number
-    geometry: PanelGeometry
-  } | null>(null)
-  const resizeRef = useRef<{
-    startX: number
-    startY: number
-    geometry: PanelGeometry
-  } | null>(null)
 
-  const enabledExtensions = useMemo(() => normalizeExtensions(extensions), [extensions])
+  const enabledExtensions = useMemo(() => normalizeCalculatorExtensions(extensions), [extensions])
   const requestedMode = mode ?? internalMode
   const activeMode = enabledExtensions.includes(requestedMode)
     ? requestedMode
@@ -491,71 +451,13 @@ export function MiraiCalculator({
   )
 
   useEffect(() => {
-    const query = window.matchMedia("(prefers-color-scheme: dark)")
-    const update = (event: MediaQueryListEvent) => setSystemDark(event.matches)
-    query.addEventListener("change", update)
-    return () => query.removeEventListener("change", update)
-  }, [])
-
-  useEffect(() => {
-    const calculator = calculatorRef.current
-    if (!calculator) return
-
-    const computed = getComputedStyle(calculator)
-    const nextStyle = Object.fromEntries(
-      PORTAL_THEME_PROPERTIES.map((property) => [
-        property,
-        computed.getPropertyValue(property).trim(),
-      ]).filter(([, value]) => value)
-    ) as CSSProperties
-    setPortalThemeStyle(nextStyle)
-  }, [className, resolvedTheme, style])
-
-  useEffect(() => {
-    if (!showBackdrop) return
-
-    const constrainPanel = () => {
-      const backdrop = backdropRef.current
-      if (!backdrop) return
-      const bounds = backdrop.getBoundingClientRect()
-      if (bounds.width < 320 || bounds.height < 320) return
-
-      setPanelGeometry((current) => {
-        const width = Math.min(
-          current.width,
-          Math.max(0, bounds.width - Math.min(16, bounds.width / 2))
-        )
-        const height = Math.min(
-          current.height,
-          Math.max(0, bounds.height - Math.min(16, bounds.height / 2))
-        )
-        const next = {
-          ...current,
-          width,
-          height,
-          x: Math.max(0, Math.min(current.x, bounds.width - width)),
-          y: Math.max(0, Math.min(current.y, bounds.height - height)),
-        }
-
-        return next.x === current.x &&
-          next.y === current.y &&
-          next.width === current.width &&
-          next.height === current.height
-          ? current
-          : next
-      })
-    }
-
-    constrainPanel()
-    const observer = new ResizeObserver(constrainPanel)
-    if (backdropRef.current) observer.observe(backdropRef.current)
-    window.addEventListener("resize", constrainPanel)
-
+    if (!fullscreen) return
+    const previousOverflow = document.documentElement.style.overflow
+    document.documentElement.style.overflow = "hidden"
     return () => {
-      observer.disconnect()
-      window.removeEventListener("resize", constrainPanel)
+      document.documentElement.style.overflow = previousOverflow
     }
-  }, [showBackdrop])
+  }, [fullscreen])
 
   const setMode = (nextMode: CalculatorMode) => {
     if (mode === undefined) setInternalMode(nextMode)
@@ -582,12 +484,7 @@ export function MiraiCalculator({
   }
 
   const formatOptions = useMemo<NumberFormatOptions>(
-    () => ({
-      notation: displaySettings.notation,
-      decimals: displaySettings.decimals,
-      significantFigures: displaySettings.significantFigures,
-      thousandsSeparator: displaySettings.thousandsSeparator,
-    }),
+    () => calculatorNumberFormatOptions(displaySettings),
     [displaySettings]
   )
 
@@ -608,10 +505,10 @@ export function MiraiCalculator({
   )
 
   const reset = () => {
-    setDisplaySettings(DEFAULT_DISPLAY_SETTINGS)
-    setGraphView(DEFAULT_GRAPH_VIEW)
+    setDisplaySettings({ ...DEFAULT_DISPLAY_SETTINGS })
+    setGraphView({ ...DEFAULT_GRAPH_VIEW })
     setGraphGridVisible(true)
-    setDefinitions([])
+    setDefinitions([...defaultDefinitions])
     setVariables({})
     setAns(0)
     setResetSignal((signal) => signal + 1)
@@ -627,104 +524,10 @@ export function MiraiCalculator({
     })
   }
 
-  const beginDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!showBackdrop || fullscreen || event.button !== 0) return
-    const target = event.target as HTMLElement
-    if (
-      target.closest(
-        "button, input, select, textarea, [role='button'], [data-slot='select-trigger']"
-      )
-    ) {
-      return
-    }
-    event.preventDefault()
-    dragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      geometry: panelGeometry,
-    }
-
-    const move = (pointerEvent: PointerEvent) => {
-      const drag = dragRef.current
-      const backdrop = backdropRef.current
-      if (!drag || !backdrop) return
-      const bounds = backdrop.getBoundingClientRect()
-      const x = drag.geometry.x + pointerEvent.clientX - drag.startX
-      const y = drag.geometry.y + pointerEvent.clientY - drag.startY
-      setPanelGeometry((current) => ({
-        ...current,
-        x: Math.max(0, Math.min(Math.max(0, bounds.width - current.width), x)),
-        y: Math.max(0, Math.min(Math.max(0, bounds.height - current.height), y)),
-      }))
-    }
-    const end = () => {
-      dragRef.current = null
-      window.removeEventListener("pointermove", move)
-      window.removeEventListener("pointerup", end)
-    }
-    window.addEventListener("pointermove", move)
-    window.addEventListener("pointerup", end)
-  }
-
-  const beginResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!showBackdrop || fullscreen || event.button !== 0) return
-    event.preventDefault()
-    event.stopPropagation()
-    resizeRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      geometry: panelGeometry,
-    }
-
-    const move = (pointerEvent: PointerEvent) => {
-      const resize = resizeRef.current
-      const backdrop = backdropRef.current
-      if (!resize || !backdrop) return
-      const bounds = backdrop.getBoundingClientRect()
-      const maximumWidth = Math.max(0, bounds.width - resize.geometry.x)
-      const maximumHeight = Math.max(0, bounds.height - resize.geometry.y)
-      const minimumWidth = Math.min(MIN_PANEL_WIDTH, maximumWidth)
-      const minimumHeight = Math.min(MIN_PANEL_HEIGHT, maximumHeight)
-      setPanelGeometry((current) => ({
-        ...current,
-        width: Math.min(
-          maximumWidth,
-          Math.max(minimumWidth, resize.geometry.width + pointerEvent.clientX - resize.startX)
-        ),
-        height: Math.min(
-          maximumHeight,
-          Math.max(minimumHeight, resize.geometry.height + pointerEvent.clientY - resize.startY)
-        ),
-      }))
-    }
-    const end = () => {
-      resizeRef.current = null
-      window.removeEventListener("pointermove", move)
-      window.removeEventListener("pointerup", end)
-    }
-    window.addEventListener("pointermove", move)
-    window.addEventListener("pointerup", end)
-  }
-
-  const rootHeight = fullscreen
-    ? "calc(100dvh - 1.5rem)"
-    : showBackdrop
-      ? `${panelGeometry.height}px`
-      : typeof height === "number"
-        ? `${height}px`
-        : height
-
   return (
     <TooltipProvider>
       <div className="mirai-calculator-package" style={{ display: "contents" }}>
-        <div
-          ref={backdropRef}
-          className={cn(
-            "relative isolate",
-            showBackdrop && "h-dvh min-h-0 overflow-hidden bg-muted"
-          )}
-        >
-          {showBackdrop && <PracticeBackdrop />}
+        <div className="relative isolate h-full min-h-0 w-full">
           {activeHidden && (
             <Tooltip>
               <TooltipTrigger
@@ -734,383 +537,522 @@ export function MiraiCalculator({
                 className={cn(
                   buttonVariants({ variant: "default", size: "icon" }),
                   "mirai-calculator size-12 rounded-xl shadow-xl",
-                  resolvedTheme === "dark" && "dark",
-                  showBackdrop && "absolute z-10"
+                  resolvedTheme
                 )}
-                style={
-                  showBackdrop
-                    ? {
-                        left: panelGeometry.x,
-                        top: panelGeometry.y,
-                      }
-                    : undefined
-                }
+                data-calculator-hidden-launcher=""
                 data-theme={resolvedTheme}
               >
                 <CalculatorIcon className="size-5" />
               </TooltipTrigger>
               <TooltipContent
                 className={cn(
-                  "mirai-calculator-package mirai-calculator-portal",
-                  resolvedTheme === "dark" && "dark"
+                  "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+                  resolvedTheme
                 )}
                 data-theme={resolvedTheme}
-                style={portalThemeStyle}
               >
                 Show calculator
               </TooltipContent>
             </Tooltip>
           )}
-          <div
-            ref={calculatorRef}
-            hidden={activeHidden}
-            className={cn(
-              "mirai-calculator flex min-h-0 w-full flex-col overflow-hidden rounded-[12px] border bg-background text-foreground shadow-xl",
-              resolvedTheme === "dark" && "dark",
-              showBackdrop && "absolute z-10",
-              fullscreen && "fixed inset-3 z-50 min-h-0 w-auto max-w-none rounded-xl",
-              className
-            )}
-            style={{
-              ...style,
-              height: rootHeight,
-              ...(showBackdrop && !fullscreen
-                ? {
-                    left: panelGeometry.x,
-                    top: panelGeometry.y,
-                    width: panelGeometry.width,
-                  }
-                : {}),
-            }}
-            data-theme={resolvedTheme}
-          >
-            <header
-              onPointerDown={beginDrag}
-              onDoubleClick={() => showBackdrop && setFullscreen((value) => !value)}
+          <CalculatorViewportPortal fullscreen={fullscreen}>
+            <div
+              ref={calculatorRef}
+              hidden={activeHidden}
               className={cn(
-                "flex min-h-[52px] shrink-0 touch-none flex-wrap items-center gap-2 border-b bg-card px-3 py-2 select-none sm:gap-3",
-                showBackdrop && !fullscreen && "cursor-grab active:cursor-grabbing"
+                "mirai-calculator @container relative flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border bg-background text-[15px] text-foreground tabular-nums shadow-xl [&_canvas]:block",
+                resolvedTheme,
+                fullscreen &&
+                  "fixed inset-3 z-[2147483000] h-[calc(100dvh-1.5rem)] min-h-0 w-auto max-w-none rounded-xl",
+                className
               )}
+              data-theme={resolvedTheme}
             >
-              <span className="sr-only">{title}</span>
-              <div aria-hidden="true" className="grid grid-cols-2 gap-[3px] p-0.5">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <span key={index} className="size-[3px] rounded-full bg-muted-foreground/35" />
-                ))}
-              </div>
-
-              {enabledExtensions.length > 0 && (
-                <nav
-                  aria-label="Calculator modes"
-                  className="mirai-mode-switcher order-3 grid w-full min-w-0 max-w-full gap-0.5 overflow-hidden rounded-lg bg-muted p-[3px] sm:order-none"
-                  style={{
-                    gridTemplateColumns: `repeat(${enabledExtensions.length}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {enabledExtensions.map((extension) => (
-                    <Button
-                      key={extension}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setMode(extension)}
-                      aria-current={activeMode === extension ? "page" : undefined}
-                      data-active={activeMode === extension ? "" : undefined}
-                      className="h-7 min-w-0 w-full rounded-md bg-transparent px-1 text-[13px] font-medium shadow-none transition-[background-color,box-shadow,color] hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:bg-background data-active:text-foreground data-active:shadow-sm"
-                    >
-                      {EXTENSION_DEFINITIONS[extension].label}
-                    </Button>
-                  ))}
-                </nav>
-              )}
-
-              <div className="ml-auto flex items-center gap-2">
-                <HeaderIconButton
-                  label={`Use ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
-                  onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-                  portalTheme={resolvedTheme}
-                  portalThemeStyle={portalThemeStyle}
-                >
-                  {resolvedTheme === "dark" ? <Sun /> : <Moon />}
-                </HeaderIconButton>
-                <HeaderIconButton
-                  label="Calculator settings"
-                  onClick={() => setSettingsOpen((open) => !open)}
-                  portalTheme={resolvedTheme}
-                  portalThemeStyle={portalThemeStyle}
-                >
-                  <Settings2 />
-                </HeaderIconButton>
-                <HeaderIconButton
-                  label="Hide calculator"
-                  onClick={() => setHidden(true)}
-                  portalTheme={resolvedTheme}
-                  portalThemeStyle={portalThemeStyle}
-                >
-                  <EyeOff />
-                </HeaderIconButton>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={reset}
-                  className="h-[30px] rounded-md px-2.5 text-xs text-muted-foreground"
-                >
-                  Reset
-                </Button>
-                <HeaderIconButton
-                  label={fullscreen ? "Exit full screen" : "Enter full screen"}
-                  onClick={() => setFullscreen((value) => !value)}
-                  portalTheme={resolvedTheme}
-                  portalThemeStyle={portalThemeStyle}
-                >
-                  {fullscreen ? <Minimize2 /> : <Expand />}
-                </HeaderIconButton>
-                {onClose && (
-                  <HeaderIconButton
-                    label="Close calculator"
-                    onClick={onClose}
-                    portalTheme={resolvedTheme}
-                    portalThemeStyle={portalThemeStyle}
-                  >
-                    <X />
-                  </HeaderIconButton>
-                )}
-              </div>
-            </header>
-
-            {settingsOpen && (
-              <section
-                aria-label="Calculator settings"
-                className="flex shrink-0 flex-wrap items-end gap-4 border-b bg-muted/35 px-4 py-3"
+              <header
+                data-calculator-drag-handle=""
+                className="mirai-calculator-header flex min-h-[52px] shrink-0 touch-none flex-nowrap items-center gap-3 overflow-hidden border-b bg-card px-3 py-2 select-none @max-[699px]:gap-1"
               >
-                {showsAngleMode && (
-                  <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Angle mode
-                    <Select
-                      value={activeAngleMode}
-                      onValueChange={(value: string | null) => {
-                        if (value === "degrees" || value === "radians") setAngleMode(value)
+                <span className="sr-only">{title}</span>
+                <span
+                  aria-hidden="true"
+                  className="grid shrink-0 grid-cols-2 gap-[3px] p-0.5 @max-[359px]:hidden"
+                >
+                  {Array.from({ length: 6 }, (_, index) => (
+                    <span key={index} className="size-[3px] rounded-full bg-muted-foreground/35" />
+                  ))}
+                </span>
+                <div className="mirai-header-brand flex shrink-0 items-center gap-2 @max-[359px]:max-w-5 @max-[359px]:overflow-hidden @max-[359px]:[&>svg]:h-5 @max-[359px]:[&>svg]:w-[79px] @max-[359px]:[&>svg]:max-w-none">
+                  <OpenMiraiLogo />
+                </div>
+
+                {enabledExtensions.length === 1 && (
+                  <span
+                    data-calculator-mode-label
+                    className="flex h-8 min-w-0 shrink-0 items-center text-sm font-medium"
+                  >
+                    {EXTENSION_DEFINITIONS[enabledExtensions[0]].label}
+                  </span>
+                )}
+
+                {enabledExtensions.length > 1 && (
+                  <>
+                    <div className="mirai-mode-select hidden min-w-0 flex-1 @max-[699px]:block">
+                      <Select
+                        value={activeMode}
+                        onValueChange={(value: string | null) => {
+                          if (
+                            value !== null &&
+                            enabledExtensions.includes(value as CalculatorExtension)
+                          ) {
+                            setMode(value as CalculatorExtension)
+                          }
+                        }}
+                      >
+                        <SelectTrigger
+                          aria-label="Calculator mode"
+                          size="sm"
+                          className="h-8 w-full min-w-0 rounded-lg border-transparent bg-muted shadow-none"
+                        >
+                          <SelectValue>{EXTENSION_DEFINITIONS[activeMode].label}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent
+                          className={cn(
+                            "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+                            resolvedTheme
+                          )}
+                          data-theme={resolvedTheme}
+                        >
+                          {enabledExtensions.map((extension) => (
+                            <SelectItem key={extension} value={extension}>
+                              {EXTENSION_DEFINITIONS[extension].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <nav
+                      aria-label="Calculator modes"
+                      className="mirai-mode-switcher relative grid min-w-0 max-w-full flex-[1_1_364px] gap-0.5 overflow-hidden rounded-lg bg-muted p-[3px] @max-[699px]:hidden"
+                      style={{
+                        gridTemplateColumns: `repeat(${enabledExtensions.length}, minmax(0, 1fr))`,
                       }}
                     >
-                      <SelectTrigger
-                        size="sm"
-                        className="w-28 bg-background"
-                        aria-label="Angle mode"
-                      >
-                        <SelectValue>{ANGLE_MODE_LABELS[activeAngleMode]}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent
-                        className={cn(
-                          "mirai-calculator-package mirai-calculator-portal",
-                          resolvedTheme === "dark" && "dark"
-                        )}
-                        data-theme={resolvedTheme}
-                        style={portalThemeStyle}
-                      >
-                        <SelectItem value="degrees">Degrees</SelectItem>
-                        <SelectItem value="radians">Radians</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </label>
-                )}
-
-                <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Notation
-                  <Select
-                    value={displaySettings.notation}
-                    onValueChange={(value: string | null) => {
-                      if (value !== "auto" && value !== "scientific") return
-                      setDisplaySettings((current) => ({
-                        ...current,
-                        notation: value,
-                      }))
-                    }}
-                  >
-                    <SelectTrigger size="sm" className="w-32 bg-background">
-                      <SelectValue>{NOTATION_LABELS[displaySettings.notation]}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent
-                      className={cn(
-                        "mirai-calculator-package mirai-calculator-portal",
-                        resolvedTheme === "dark" && "dark"
-                      )}
-                      data-theme={resolvedTheme}
-                      style={portalThemeStyle}
-                    >
-                      <SelectItem value="auto">Automatic</SelectItem>
-                      <SelectItem value="scientific">Scientific</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Decimals
-                  <Select
-                    value={String(displaySettings.decimals)}
-                    onValueChange={(value) => {
-                      if (value === null) return
-                      setDisplaySettings((current) => ({
-                        ...current,
-                        decimals: value === "auto" ? "auto" : Number(value),
-                      }))
-                    }}
-                  >
-                    <SelectTrigger size="sm" className="w-24 bg-background">
-                      <SelectValue>
-                        {displaySettings.decimals === "auto"
-                          ? "Auto"
-                          : String(displaySettings.decimals)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent
-                      className={cn(
-                        "mirai-calculator-package mirai-calculator-portal",
-                        resolvedTheme === "dark" && "dark"
-                      )}
-                      data-theme={resolvedTheme}
-                      style={portalThemeStyle}
-                    >
-                      <SelectItem value="auto">Auto</SelectItem>
-                      {DECIMAL_OPTIONS.map((value) => (
-                        <SelectItem key={value} value={String(value)}>
-                          {value}
-                        </SelectItem>
+                      {enabledExtensions.map((extension) => (
+                        <Button
+                          key={extension}
+                          aria-label={EXTENSION_DEFINITIONS[extension].label}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setMode(extension)}
+                          aria-current={activeMode === extension ? "page" : undefined}
+                          data-active={activeMode === extension ? "" : undefined}
+                          className="h-7 min-w-0 w-full rounded-md bg-transparent px-1 text-[13px] font-medium shadow-none transition-[background-color,box-shadow,color] hover:!bg-foreground/[0.08] hover:!text-foreground focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:bg-background data-active:text-foreground data-active:shadow-sm data-active:hover:!bg-background"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="mirai-mode-label @max-[699px]:text-[11px]"
+                            data-compact-label={EXTENSION_DEFINITIONS[extension].compactLabel}
+                          >
+                            {EXTENSION_DEFINITIONS[extension].label}
+                          </span>
+                        </Button>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Sig figs
-                  <Input
-                    type="number"
-                    min={1}
-                    max={15}
-                    value={displaySettings.significantFigures}
-                    onChange={(event) =>
-                      setDisplaySettings((current) => ({
-                        ...current,
-                        significantFigures: Math.max(
-                          1,
-                          Math.min(15, Number(event.target.value) || 1)
-                        ),
-                      }))
-                    }
-                    className="h-8 w-20 bg-background"
-                  />
-                </label>
-
-                <label className="flex h-8 items-center gap-2 text-sm">
-                  <Switch
-                    checked={displaySettings.thousandsSeparator}
-                    onCheckedChange={(checked) =>
-                      setDisplaySettings((current) => ({
-                        ...current,
-                        thousandsSeparator: checked,
-                      }))
-                    }
-                  />
-                  Thousands separators
-                </label>
-
-                {showsGraphSettings && (
-                  <>
-                    <Separator orientation="vertical" className="hidden h-10 sm:block" />
-
-                    {GRAPH_BOUNDARY_KEYS.map((key) => (
-                      <label
-                        key={key}
-                        className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                      >
-                        {key.replace("min", " min").replace("max", " max")}
-                        <Input
-                          type="number"
-                          value={graphView[key]}
-                          onChange={(event) => updateGraphBoundary(key, event.target.value)}
-                          className="h-8 w-20 bg-background font-mono"
-                        />
-                      </label>
-                    ))}
-
-                    <label className="flex h-8 items-center gap-2 text-sm">
-                      <Switch checked={graphGridVisible} onCheckedChange={setGraphGridVisible} />
-                      Grid lines
-                    </label>
+                    </nav>
                   </>
                 )}
 
-                <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Theme
-                  <Select
-                    value={activeTheme}
-                    onValueChange={(value: string | null) => {
-                      if (value === "light" || value === "dark" || value === "system") {
-                        setTheme(value)
-                      }
-                    }}
+                <div className="mirai-header-actions ml-auto flex shrink-0 items-center gap-2 @max-[699px]:gap-1">
+                  <HeaderIconButton
+                    label={`Use ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
+                    onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                    portalTheme={resolvedTheme}
                   >
-                    <SelectTrigger size="sm" className="w-28 bg-background">
-                      <SelectValue>{THEME_LABELS[activeTheme]}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent
-                      className={cn(
-                        "mirai-calculator-package mirai-calculator-portal",
-                        resolvedTheme === "dark" && "dark"
-                      )}
-                      data-theme={resolvedTheme}
-                      style={portalThemeStyle}
+                    {resolvedTheme === "dark" ? <Sun /> : <Moon />}
+                  </HeaderIconButton>
+                  <Button
+                    type="button"
+                    aria-label="Calculator settings"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setSettingsOpen(true)}
+                    className={cn(
+                      "size-[30px] rounded-md",
+                      settingsOpen && "bg-muted text-foreground"
+                    )}
+                  >
+                    <Settings2 />
+                  </Button>
+                  {settingsOpen && calculatorRef.current
+                    ? createPortal(
+                        <div
+                          className="absolute inset-0 z-[60] flex items-center justify-center overflow-hidden rounded-[inherit] bg-black/25 p-3 backdrop-blur-[7px]"
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") setSettingsOpen(false)
+                          }}
+                          onPointerDown={(event) => {
+                            if (event.target === event.currentTarget) setSettingsOpen(false)
+                          }}
+                        >
+                          <section
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Calculator settings"
+                            tabIndex={-1}
+                            className={cn(
+                              "mirai-calculator-package mirai-calculator-portal mirai-calculator-settings-dialog relative grid min-h-0 max-h-[calc(100%_-_1.5rem)] w-[calc(100%_-_1.5rem)] max-w-[640px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-xl border bg-popover p-0 shadow-2xl ring-1 ring-foreground/10",
+                              resolvedTheme
+                            )}
+                            data-theme={resolvedTheme}
+                          >
+                            <Button
+                              type="button"
+                              aria-label="Close calculator settings"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setSettingsOpen(false)}
+                              className="absolute top-2 right-2 z-10"
+                            >
+                              <X />
+                            </Button>
+                            <div className="border-b bg-muted/20 px-5 py-4 pr-12">
+                              <div className="flex items-center gap-3">
+                                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground shadow-xs">
+                                  <Settings2 className="size-4" />
+                                </span>
+                                <div className="min-w-0">
+                                  <h2 className="text-sm font-semibold">Calculator settings</h2>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Format results and tune the active workspace.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              data-calculator-settings-body=""
+                              className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain p-5 sm:grid-cols-2"
+                            >
+                              <section
+                                aria-labelledby="mirai-number-format-heading"
+                                className="rounded-lg border bg-background/60 p-4"
+                              >
+                                <h3
+                                  id="mirai-number-format-heading"
+                                  className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                                >
+                                  Number format
+                                </h3>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {showsAngleMode && (
+                                    <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                                      Angle mode
+                                      <Select
+                                        value={activeAngleMode}
+                                        onValueChange={(value: string | null) => {
+                                          if (value === "degrees" || value === "radians")
+                                            setAngleMode(value)
+                                        }}
+                                      >
+                                        <SelectTrigger
+                                          size="sm"
+                                          className="w-full bg-background"
+                                          aria-label="Angle mode"
+                                        >
+                                          <SelectValue>
+                                            {ANGLE_MODE_LABELS[activeAngleMode]}
+                                          </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent
+                                          className={cn(
+                                            "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+                                            resolvedTheme
+                                          )}
+                                          data-theme={resolvedTheme}
+                                        >
+                                          <SelectItem value="degrees">Degrees</SelectItem>
+                                          <SelectItem value="radians">Radians</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </label>
+                                  )}
+
+                                  <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                                    Notation
+                                    <Select
+                                      value={displaySettings.notation}
+                                      onValueChange={(value: string | null) => {
+                                        if (value !== "auto" && value !== "scientific") return
+                                        setDisplaySettings((current) => ({
+                                          ...current,
+                                          notation: value,
+                                        }))
+                                      }}
+                                    >
+                                      <SelectTrigger size="sm" className="w-full bg-background">
+                                        <SelectValue>
+                                          {NOTATION_LABELS[displaySettings.notation]}
+                                        </SelectValue>
+                                      </SelectTrigger>
+                                      <SelectContent
+                                        className={cn(
+                                          "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+                                          resolvedTheme
+                                        )}
+                                        data-theme={resolvedTheme}
+                                      >
+                                        <SelectItem value="auto">Automatic</SelectItem>
+                                        <SelectItem value="scientific">Scientific</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </label>
+
+                                  <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                                    Decimals
+                                    <Select
+                                      value={String(displaySettings.decimals)}
+                                      onValueChange={(value) => {
+                                        if (value === null) return
+                                        setDisplaySettings((current) => ({
+                                          ...current,
+                                          decimals: value === "auto" ? "auto" : Number(value),
+                                        }))
+                                      }}
+                                    >
+                                      <SelectTrigger size="sm" className="w-full bg-background">
+                                        <SelectValue>
+                                          {displaySettings.decimals === "auto"
+                                            ? "Auto"
+                                            : String(displaySettings.decimals)}
+                                        </SelectValue>
+                                      </SelectTrigger>
+                                      <SelectContent
+                                        className={cn(
+                                          "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+                                          resolvedTheme
+                                        )}
+                                        data-theme={resolvedTheme}
+                                      >
+                                        <SelectItem value="auto">Auto</SelectItem>
+                                        {DECIMAL_OPTIONS.map((value) => (
+                                          <SelectItem key={value} value={String(value)}>
+                                            {value}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </label>
+
+                                  <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                                    Significant figures
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={15}
+                                      value={displaySettings.significantFigures}
+                                      onChange={(event) =>
+                                        setDisplaySettings((current) => ({
+                                          ...current,
+                                          significantFigures: Math.max(
+                                            1,
+                                            Math.min(15, Number(event.target.value) || 1)
+                                          ),
+                                        }))
+                                      }
+                                      className="h-7 w-full bg-background"
+                                    />
+                                  </label>
+                                </div>
+
+                                <label className="mt-3 flex items-center justify-between gap-4 rounded-md border bg-muted/25 px-3 py-2.5 text-sm">
+                                  <span>
+                                    <strong className="block text-xs font-medium">
+                                      Thousands separators
+                                    </strong>
+                                    <small className="text-[11px] text-muted-foreground">
+                                      Group large values for readability.
+                                    </small>
+                                  </span>
+                                  <Switch
+                                    checked={displaySettings.thousandsSeparator}
+                                    onCheckedChange={(checked) =>
+                                      setDisplaySettings((current) => ({
+                                        ...current,
+                                        thousandsSeparator: checked,
+                                      }))
+                                    }
+                                  />
+                                </label>
+                              </section>
+
+                              {showsGraphSettings && (
+                                <section
+                                  aria-labelledby="mirai-graph-viewport-heading"
+                                  className="rounded-lg border bg-background/60 p-4"
+                                >
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <h3
+                                      id="mirai-graph-viewport-heading"
+                                      className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                                    >
+                                      Graph viewport
+                                    </h3>
+                                    <label className="flex items-center gap-2 text-xs">
+                                      Grid lines
+                                      <Switch
+                                        checked={graphGridVisible}
+                                        onCheckedChange={setGraphGridVisible}
+                                      />
+                                    </label>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {GRAPH_BOUNDARY_KEYS.map((key) => (
+                                      <label
+                                        key={key}
+                                        className="grid gap-1.5 text-xs font-medium text-muted-foreground"
+                                      >
+                                        {key.replace("min", " min").replace("max", " max")}
+                                        <Input
+                                          type="number"
+                                          value={graphView[key]}
+                                          onChange={(event) =>
+                                            updateGraphBoundary(key, event.target.value)
+                                          }
+                                          className="h-7 w-full bg-background font-mono"
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </section>
+                              )}
+
+                              <section
+                                aria-labelledby="mirai-appearance-heading"
+                                className="rounded-lg border bg-background/60 p-4"
+                              >
+                                <h3
+                                  id="mirai-appearance-heading"
+                                  className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                                >
+                                  Appearance
+                                </h3>
+                                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                                  Theme
+                                  <Select
+                                    value={activeTheme}
+                                    onValueChange={(value: string | null) => {
+                                      if (
+                                        value === "light" ||
+                                        value === "dark" ||
+                                        value === "system"
+                                      ) {
+                                        setTheme(value)
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger size="sm" className="w-full bg-background">
+                                      <SelectValue>{THEME_LABELS[activeTheme]}</SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent
+                                      className={cn(
+                                        "mirai-calculator-package mirai-calculator-portal z-[2147483002]",
+                                        resolvedTheme
+                                      )}
+                                      data-theme={resolvedTheme}
+                                    >
+                                      <SelectItem value="light">Light</SelectItem>
+                                      <SelectItem value="dark">Dark</SelectItem>
+                                      <SelectItem value="system">System</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </label>
+                              </section>
+                            </div>
+                            <div className="flex justify-end border-t bg-muted/20 px-5 py-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSettingsOpen(false)}
+                              >
+                                Done
+                              </Button>
+                            </div>
+                          </section>
+                        </div>,
+                        calculatorRef.current
+                      )
+                    : null}
+                  <HeaderIconButton
+                    label="Hide calculator"
+                    onClick={() => setHidden(true)}
+                    portalTheme={resolvedTheme}
+                  >
+                    <EyeOff />
+                  </HeaderIconButton>
+                  <Button
+                    aria-label="Reset"
+                    variant="outline"
+                    size="sm"
+                    onClick={reset}
+                    className="mirai-header-reset h-[30px] min-w-[30px] rounded-md px-2.5 text-xs text-muted-foreground @max-[699px]:w-[30px] @max-[699px]:px-0"
+                  >
+                    <RotateCcw
+                      aria-hidden="true"
+                      className="mirai-header-reset-icon hidden size-4 @max-[699px]:block"
+                    />
+                    <span className="mirai-header-reset-label @max-[699px]:hidden">Reset</span>
+                  </Button>
+                  <HeaderIconButton
+                    label={fullscreen ? "Exit full screen" : "Enter full screen"}
+                    onClick={() => setFullscreen((value) => !value)}
+                    portalTheme={resolvedTheme}
+                  >
+                    {fullscreen ? <Minimize2 /> : <Expand />}
+                  </HeaderIconButton>
+                  {onClose && (
+                    <HeaderIconButton
+                      label="Close calculator"
+                      onClick={onClose}
+                      portalTheme={resolvedTheme}
                     >
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="system">System</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </label>
-              </section>
-            )}
-
-            <main className="flex min-h-0 flex-1 flex-col">
-              {activeMode ? (
-                EXTENSION_DEFINITIONS[activeMode].render({
-                  resetSignal,
-                  engine,
-                  activeAngleMode,
-                  ans,
-                  definitions,
-                  setDefinitions,
-                  setAns,
-                  formatOptions,
-                  formatNumber,
-                  setVariables,
-                  graphView,
-                  setGraphView,
-                  graphGridVisible,
-                  setGraphGridVisible,
-                  resolvedTheme,
-                })
-              ) : (
-                <div
-                  role="status"
-                  className="flex min-h-48 flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground"
-                >
-                  No calculator extensions enabled
+                      <X />
+                    </HeaderIconButton>
+                  )}
                 </div>
-              )}
-            </main>
+              </header>
 
-            {showBackdrop && !fullscreen && (
-              <div
-                role="separator"
-                aria-label="Resize calculator"
-                aria-orientation="vertical"
-                onPointerDown={beginResize}
-                className="absolute right-0 bottom-0 z-20 size-[18px] touch-none cursor-nwse-resize"
-                style={{
-                  background:
-                    "linear-gradient(135deg, transparent 46%, color-mix(in oklab, var(--mirai-muted-foreground) 45%, transparent) 46%, color-mix(in oklab, var(--mirai-muted-foreground) 45%, transparent) 54%, transparent 54%, transparent 70%, color-mix(in oklab, var(--mirai-muted-foreground) 45%, transparent) 70%, color-mix(in oklab, var(--mirai-muted-foreground) 45%, transparent) 78%, transparent 78%)",
-                }}
-              />
-            )}
-          </div>
+              <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {activeMode ? (
+                  EXTENSION_DEFINITIONS[activeMode].render({
+                    resetSignal,
+                    engine,
+                    activeAngleMode,
+                    ans,
+                    definitions,
+                    setDefinitions,
+                    setAns,
+                    formatOptions,
+                    formatNumber,
+                    setVariables,
+                    graphView,
+                    setGraphView,
+                    graphGridVisible,
+                    setGraphGridVisible,
+                    resolvedTheme,
+                    defaultGraphingData,
+                    defaultStatisticsData,
+                    defaultToolsData,
+                  })
+                ) : (
+                  <div
+                    role="status"
+                    className="flex min-h-48 flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground"
+                  >
+                    No calculator extensions enabled
+                  </div>
+                )}
+              </main>
+            </div>
+          </CalculatorViewportPortal>
         </div>
       </div>
     </TooltipProvider>

@@ -51,6 +51,16 @@
         "default": "./dist/engine.cjs"
       }
     },
+    "./configuration": {
+      "import": {
+        "types": "./dist/mirai-calculator/configuration.d.ts",
+        "default": "./dist/configuration.js"
+      },
+      "require": {
+        "types": "./dist/mirai-calculator/configuration.d.cts",
+        "default": "./dist/configuration.cjs"
+      }
+    },
     "./graphing": {
       "import": {
         "types": "./dist/mirai-calculator/graphing.d.ts",

@@ -69,10 +69,9 @@ The registry item copies the calculator into
 installs `@openmirai/calculator-core`. The copied component owns its styles, so
 there is no separate UI package or stylesheet package to install.
 
-The calculator preserves the visual baseline from `v0.1.6`; the registry does
-not add package-specific branding to the calculator chrome. The OpenMirai
-wordmark remains embedded in the practice backdrop without an external logo
-asset or branding toggle.
+The calculator preserves the layout and control baseline from `v0.1.6`. The
+OpenMirai wordmark is embedded directly in the calculator chrome, without an
+external logo asset or branding toggle.
 
 The registry supports projects initialized with Base UI or Radix without
 replacing unrelated components or global theme variables.
@@ -94,33 +93,44 @@ export function CalculatorPage() {
   }
 
   return (
-    <MiraiCalculator
-      extensions={[CalculatorExtension.SCIENTIFIC, CalculatorExtension.GRAPHING]}
-      height={660}
-      defaultMode={CalculatorExtension.SCIENTIFIC}
-      defaultTheme="system"
-      onModeChange={handleModeChange}
-    />
+    <div className="h-[660px]">
+      <MiraiCalculator
+        extensions={[CalculatorExtension.SCIENTIFIC, CalculatorExtension.GRAPHING]}
+        defaultMode={CalculatorExtension.SCIENTIFIC}
+        defaultTheme="system"
+        onModeChange={handleModeChange}
+      />
+    </div>
   )
 }
 ```
 
-### Practice-player panel
+### Host-controlled layout
 
-Enable the OpenMirai backdrop and floating panel with `showBackdrop`. The
-header becomes draggable, the bottom-right corner resizes the calculator, and
-double-clicking the header toggles fullscreen.
+The registry intentionally excludes practice questions, answer choices, and
+other preview scenery. Applications own that backdrop and the calculator's
+dimensions. The calculator fills its parent instead of exposing width or height
+props, so the same component responds to any page, panel, or resizable shell.
 
 ```tsx
 import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 
 export function PracticePlayer() {
-  return <MiraiCalculator showBackdrop title="OpenMirai Calculator" defaultTheme="light" />
+  return (
+    <div className="relative h-[760px] overflow-hidden">
+      <YourAppBackdrop />
+      <div className="absolute inset-x-[4%] top-[18%] bottom-[4%]">
+        <MiraiCalculator title="OpenMirai Calculator" />
+      </div>
+    </div>
+  )
 }
 ```
 
-The floating panel starts at `1040 × 660` pixels and respects a `720 × 460`
-minimum while remaining bounded by the backdrop.
+No calculator stylesheet is required. All component styling is expressed with
+Tailwind utilities and semantic shadcn tokens such as `bg-background`,
+`text-foreground`, and `border-border`, so the installed source follows the
+consumer's theme customization.
 
 ### Controlled state
 
@@ -154,28 +164,25 @@ export function ControlledCalculator() {
 
 ### Component API
 
-| Prop                | Type                             |        Default | Description                                         |
-| ------------------- | -------------------------------- | -------------: | --------------------------------------------------- |
-| `className`         | `string`                         |              — | Additional class names for the calculator panel     |
-| `style`             | `CSSProperties`                  |              — | Inline styles for the calculator panel              |
-| `height`            | `number \| string`               |          `660` | Standalone panel height                             |
-| `extensions`        | `readonly CalculatorExtension[]` |      all modes | Enabled modes in their navigation order             |
-| `mode`              | `CalculatorMode`                 |              — | Controlled calculator mode                          |
-| `defaultMode`       | `CalculatorMode`                 | `"scientific"` | Initial uncontrolled mode                           |
-| `onModeChange`      | `(mode) => void`                 |              — | Called after the mode changes                       |
-| `angleMode`         | `"degrees" \| "radians"`         |              — | Controlled angle mode                               |
-| `defaultAngleMode`  | `"degrees" \| "radians"`         |    `"degrees"` | Initial uncontrolled angle mode                     |
-| `onAngleModeChange` | `(mode) => void`                 |              — | Called after the angle mode changes                 |
-| `theme`             | `"light" \| "dark" \| "system"`  |              — | Controlled color theme                              |
-| `defaultTheme`      | `"light" \| "dark" \| "system"`  |      `"light"` | Initial uncontrolled theme                          |
-| `onThemeChange`     | `(theme) => void`                |              — | Called after the theme changes                      |
-| `hidden`            | `boolean`                        |              — | Controlled hidden state                             |
-| `defaultHidden`     | `boolean`                        |        `false` | Initial uncontrolled hidden state                   |
-| `onHiddenChange`    | `(hidden) => void`               |              — | Called after the hidden state changes               |
-| `startFullscreen`   | `boolean`                        |        `false` | Opens the panel in fullscreen mode                  |
-| `showBackdrop`      | `boolean`                        |        `false` | Enables the practice backdrop and panel drag/resize |
-| `title`             | `string`                         | `"Calculator"` | Accessible panel title                              |
-| `onClose`           | `() => void`                     |              — | Adds a close button and handles its action          |
+| Prop                | Type                             |        Default | Description                                     |
+| ------------------- | -------------------------------- | -------------: | ----------------------------------------------- |
+| `className`         | `string`                         |              — | Additional class names for the calculator panel |
+| `extensions`        | `readonly CalculatorExtension[]` |      all modes | Enabled modes in their navigation order         |
+| `mode`              | `CalculatorMode`                 |              — | Controlled calculator mode                      |
+| `defaultMode`       | `CalculatorMode`                 | `"scientific"` | Initial uncontrolled mode                       |
+| `onModeChange`      | `(mode) => void`                 |              — | Called after the mode changes                   |
+| `angleMode`         | `"degrees" \| "radians"`         |              — | Controlled angle mode                           |
+| `defaultAngleMode`  | `"degrees" \| "radians"`         |    `"degrees"` | Initial uncontrolled angle mode                 |
+| `onAngleModeChange` | `(mode) => void`                 |              — | Called after the angle mode changes             |
+| `theme`             | `"light" \| "dark" \| "system"`  |              — | Controlled color theme                          |
+| `defaultTheme`      | `"light" \| "dark" \| "system"`  |      `"light"` | Initial uncontrolled theme                      |
+| `onThemeChange`     | `(theme) => void`                |              — | Called after the theme changes                  |
+| `hidden`            | `boolean`                        |              — | Controlled hidden state                         |
+| `defaultHidden`     | `boolean`                        |        `false` | Initial uncontrolled hidden state               |
+| `onHiddenChange`    | `(hidden) => void`               |              — | Called after the hidden state changes           |
+| `startFullscreen`   | `boolean`                        |        `false` | Opens the panel in fullscreen mode              |
+| `title`             | `string`                         | `"Calculator"` | Accessible panel title                          |
+| `onClose`           | `() => void`                     |              — | Adds a close button and handles its action      |
 
 ```ts
 const CalculatorExtension = {

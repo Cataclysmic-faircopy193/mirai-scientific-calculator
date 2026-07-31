@@ -92,6 +92,7 @@ function stableMean(values: readonly number[]): number {
     : compensatedSum(values, (value) => value / values.length)
 }
 
+/** Parses finite numeric values from whitespace-, comma-, or semicolon-delimited input. */
 export function parseNumberList(source: string): number[] {
   return source
     .trim()
@@ -101,6 +102,22 @@ export function parseNumberList(source: string): number[] {
     .filter(Number.isFinite)
 }
 
+/** Creates a padded numeric extent suitable for plotting a list of values. */
+export function calculateNumberExtent(values: readonly number[]): [number, number] {
+  if (values.length === 0) return [0, 1]
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  if (minimum === maximum) return [minimum - 1, maximum + 1]
+  const padding = (maximum - minimum) * 0.1
+  return [minimum - padding, maximum + padding]
+}
+
+/** Serializes initial statistics values for a plain-text numeric input. */
+export function serializeNumberList(values: readonly (number | string)[] | undefined): string {
+  return values?.join(", ") ?? ""
+}
+
+/** Interpolates a percentile from an already sorted finite numeric list. */
 export function quantile(sortedValues: number[], percentile: number): number {
   if (sortedValues.length === 0) {
     throw new Error("Quantile needs at least one value")
@@ -118,6 +135,7 @@ export function quantile(sortedValues: number[], percentile: number): number {
   return compensatedSum([sortedValues[lower] * (1 - fraction), sortedValues[upper] * fraction])
 }
 
+/** Calculates descriptive statistics for a non-empty finite numeric sample. */
 export function calculateStatistics(values: number[]): DescriptiveStatistics {
   if (values.length === 0) {
     throw new Error("At least one finite value is required")
@@ -179,6 +197,7 @@ export function calculateStatistics(values: number[]): DescriptiveStatistics {
   }
 }
 
+/** Calculates sample covariance for two paired finite lists. */
 export function covariance(xValues: number[], yValues: number[]): number {
   if (xValues.length !== yValues.length) {
     throw new Error("Paired lists must have the same length")
@@ -211,6 +230,7 @@ export function covariance(xValues: number[], yValues: number[]): number {
   return normalizedCovariance * xScale * yScale
 }
 
+/** Calculates the bounded Pearson correlation for two paired finite lists. */
 export function correlation(xValues: number[], yValues: number[]): number {
   if (xValues.length !== yValues.length) {
     throw new Error("Paired lists must have the same length")
@@ -456,6 +476,7 @@ function finalizeRegression(
   }
 }
 
+/** Fits a supported regression model to paired finite x and y observations. */
 export function fitRegression(
   xInput: number[],
   yInput: number[],

@@ -8,7 +8,7 @@ import {
   type CalculatorExtension as CalculatorExtensionValue,
 } from "@/components/mirai-calculator/mirai-calculator"
 import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { CodeBlock } from "@/site/code-block"
 import { INSTALL_COMMAND } from "@/site/constants/docs"
 import { DISTRIBUTION_LAYERS } from "@/site/constants/home"
@@ -18,6 +18,7 @@ import { EXTENSIONS } from "@/site/site-data"
 
 const DEFAULT_ACTIVE_EXTENSION = CalculatorExtension.SCIENTIFIC
 
+/** Renders the calculator package overview and interactive extension showcase. */
 export function HomePage() {
   const [activeExtension, setActiveExtension] =
     useState<CalculatorExtensionValue>(DEFAULT_ACTIVE_EXTENSION)
@@ -94,12 +95,11 @@ export function HomePage() {
           ))}
         </div>
 
-        <div className="mt-5">
+        <div className="mt-5 h-[650px]">
           <MiraiCalculator
             extensions={[activeExtension]}
             mode={activeExtension}
             onModeChange={setActiveExtension}
-            height={650}
             defaultTheme="system"
             title={`${activeDetail.label} calculator preview`}
           />
@@ -143,20 +143,22 @@ export function HomePage() {
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {EXTENSIONS.map((extension) => (
-            <Card key={extension.id} size="sm">
-              <CardHeader>
+            <Card key={extension.id} size="sm" className="h-full">
+              <CardHeader className="flex-1">
                 <extension.icon className="mb-4 size-5 text-primary" />
                 <CardTitle>{extension.label}</CardTitle>
                 <CardDescription className="leading-6">{extension.summary}</CardDescription>
+              </CardHeader>
+              <CardFooter className="mt-auto border-t-0 bg-transparent pt-0">
                 <Button
                   variant="link"
                   nativeButton={false}
-                  className="mt-3 w-fit px-0"
+                  className="w-fit px-0"
                   render={<Link to="/extensions/$id" params={{ id: extension.id }} />}
                 >
                   Details <ArrowRight />
                 </Button>
-              </CardHeader>
+              </CardFooter>
             </Card>
           ))}
         </div>

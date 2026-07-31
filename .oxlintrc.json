@@ -1,5 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": [
+    {
+      "name": "jsdoc-required",
+      "specifier": "eslint-plugin-jsdoc"
+    }
+  ],
   "plugins": [],
   "categories": {
     "correctness": "error"
@@ -111,6 +117,23 @@
           {
             "allowConstantExport": true
           }
+        ],
+        "jsdoc-required/check-alignment": "warn",
+        "jsdoc-required/check-tag-names": "warn",
+        "jsdoc-required/require-description": "warn",
+        "jsdoc-required/require-jsdoc": [
+          "warn",
+          {
+            "publicOnly": true,
+            "require": {
+              "ArrowFunctionExpression": true,
+              "ClassDeclaration": true,
+              "ClassExpression": true,
+              "FunctionDeclaration": true,
+              "FunctionExpression": true,
+              "MethodDefinition": false
+            }
+          }
         ]
       },
       "plugins": ["typescript", "react"],
@@ -122,7 +145,8 @@
     {
       "files": ["apps/web/src/components/ui/**/*.tsx"],
       "rules": {
-        "react/only-export-components": "off"
+        "react/only-export-components": "off",
+        "jsdoc-required/require-jsdoc": "off"
       },
       "plugins": ["react"]
     },

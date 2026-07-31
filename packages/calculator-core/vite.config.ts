@@ -17,6 +17,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: path.resolve(import.meta.dirname, "src/index.ts"),
+        configuration: path.resolve(import.meta.dirname, "src/mirai-calculator/configuration.ts"),
         engine: path.resolve(import.meta.dirname, "src/mirai-calculator/calculator-engine.ts"),
         graphing: path.resolve(import.meta.dirname, "src/mirai-calculator/graphing.ts"),
         statistics: path.resolve(import.meta.dirname, "src/mirai-calculator/statistics.ts"),

@@ -17,6 +17,7 @@ export const INSTALLATION_EXAMPLE = `import {
   MiraiCalculator,
 } from "@/components/mirai-calculator/mirai-calculator"
 
+/** Supplies the static installation example used by the documentation code block. */
 export function CalculatorWorkspace() {
   return (
     <MiraiCalculator

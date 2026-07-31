@@ -1,9 +1,7 @@
 import { ArrowDown, ArrowUp, RotateCcw } from "lucide-react"
+import { domAnimation, LazyMotion, m, MotionConfig } from "motion/react"
 
-import {
-  MiraiCalculator,
-  type CalculatorExtension as CalculatorExtensionValue,
-} from "@/components/mirai-calculator/mirai-calculator"
+import { type CalculatorExtension as CalculatorExtensionValue } from "@/components/mirai-calculator/mirai-calculator"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -19,28 +17,22 @@ import {
   CALCULATOR_THEME_OPTIONS,
   createPlaygroundSnippet,
   DEFAULT_PLAYGROUND_SEARCH,
+  movePlaygroundExtension,
+  orderPlaygroundExtensionOptions,
   parsePlaygroundExtensions,
+  PLAYGROUND_DEFAULT_DEFINITIONS,
+  PLAYGROUND_EXTENSION_LAYOUT_TRANSITION,
+  PLAYGROUND_GRAPHING_DATA,
+  PLAYGROUND_STATISTICS_DATA,
+  PLAYGROUND_TOOLS_DATA,
   serializePlaygroundExtensions,
   type PlaygroundSearch,
 } from "@/site/constants/playground"
 import { CodePreview } from "@/site/code-preview"
+import { PlaygroundCalculatorPreview } from "@/site/playground-calculator-preview"
 import { EXTENSIONS } from "@/site/site-data"
 
-function moveExtension(
-  extensions: readonly CalculatorExtensionValue[],
-  extension: CalculatorExtensionValue,
-  direction: -1 | 1
-) {
-  const currentIndex = extensions.indexOf(extension)
-  const nextIndex = currentIndex + direction
-  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= extensions.length) return [...extensions]
-
-  const nextExtensions = [...extensions]
-  const [selected] = nextExtensions.splice(currentIndex, 1)
-  nextExtensions.splice(nextIndex, 0, selected)
-  return nextExtensions
-}
-
+/** Renders the URL-synchronized calculator configurator and generated source preview. */
 export function PlaygroundPage({
   search,
   onSearchChange,
@@ -49,6 +41,8 @@ export function PlaygroundPage({
   onSearchChange: (search: PlaygroundSearch) => void
 }) {
   const extensions = parsePlaygroundExtensions(search.extensions)
+  const enabledExtensions = new Set(extensions)
+  const extensionOptions = orderPlaygroundExtensionOptions(extensions, EXTENSIONS)
   const activeMode = extensions.find((extension) => extension === search.mode) ?? extensions[0]
   const activeExtensionLabel =
     EXTENSIONS.find((extension) => extension.id === activeMode)?.label ?? activeMode
@@ -59,7 +53,8 @@ export function PlaygroundPage({
     extensions,
     mode: activeMode,
     calculatorTheme: search.calculatorTheme,
-    backdrop: search.backdrop,
+    statisticsData: PLAYGROUND_STATISTICS_DATA,
+    toolsData: PLAYGROUND_TOOLS_DATA,
   })
 
   const setExtensions = (nextExtensions: readonly CalculatorExtensionValue[]) => {
@@ -94,58 +89,68 @@ export function PlaygroundPage({
               <CardTitle>Extensions</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              {EXTENSIONS.map((extension) => {
-                const enabled = extensions.includes(extension.id)
-                const enabledIndex = extensions.indexOf(extension.id)
-                return (
-                  <div
-                    key={extension.id}
-                    className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border p-3"
-                  >
-                    <label className="flex min-w-0 cursor-pointer items-center gap-3">
-                      <Switch
-                        checked={enabled}
-                        onCheckedChange={(checked) =>
-                          setExtensions(
-                            checked
-                              ? [...extensions, extension.id]
-                              : extensions.filter((value) => value !== extension.id)
-                          )
-                        }
-                        aria-label={`${enabled ? "Disable" : "Enable"} ${extension.label}`}
-                      />
-                      <span className="min-w-0">
-                        <strong className="block truncate text-sm font-medium">
-                          {extension.label}
-                        </strong>
-                        <small className="block truncate text-muted-foreground">
-                          {extension.eyebrow}
-                        </small>
-                      </span>
-                    </label>
-                    <div className="flex">
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        disabled={!enabled || enabledIndex === 0}
-                        onClick={() => setExtensions(moveExtension(extensions, extension.id, -1))}
-                        aria-label={`Move ${extension.label} up`}
+              <MotionConfig reducedMotion="user">
+                <LazyMotion features={domAnimation}>
+                  {extensionOptions.map((extension) => {
+                    const enabled = enabledExtensions.has(extension.id)
+                    const enabledIndex = extensions.indexOf(extension.id)
+                    return (
+                      <m.div
+                        layout="position"
+                        transition={PLAYGROUND_EXTENSION_LAYOUT_TRANSITION}
+                        key={extension.id}
+                        className="relative grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border p-3"
                       >
-                        <ArrowUp />
-                      </Button>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        disabled={!enabled || enabledIndex === extensions.length - 1}
-                        onClick={() => setExtensions(moveExtension(extensions, extension.id, 1))}
-                        aria-label={`Move ${extension.label} down`}
-                      >
-                        <ArrowDown />
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
+                        <label className="flex min-w-0 cursor-pointer items-center gap-3">
+                          <Switch
+                            checked={enabled}
+                            onCheckedChange={(checked) =>
+                              setExtensions(
+                                checked
+                                  ? [...extensions, extension.id]
+                                  : extensions.filter((value) => value !== extension.id)
+                              )
+                            }
+                            aria-label={`${enabled ? "Disable" : "Enable"} ${extension.label}`}
+                          />
+                          <span className="min-w-0">
+                            <strong className="block truncate text-sm font-medium">
+                              {extension.label}
+                            </strong>
+                            <small className="block truncate text-muted-foreground">
+                              {extension.eyebrow}
+                            </small>
+                          </span>
+                        </label>
+                        <div className="flex">
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            disabled={!enabled || enabledIndex === 0}
+                            onClick={() =>
+                              setExtensions(movePlaygroundExtension(extensions, extension.id, -1))
+                            }
+                            aria-label={`Move ${extension.label} up`}
+                          >
+                            <ArrowUp />
+                          </Button>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            disabled={!enabled || enabledIndex === extensions.length - 1}
+                            onClick={() =>
+                              setExtensions(movePlaygroundExtension(extensions, extension.id, 1))
+                            }
+                            aria-label={`Move ${extension.label} down`}
+                          >
+                            <ArrowDown />
+                          </Button>
+                        </div>
+                      </m.div>
+                    )
+                  })}
+                </LazyMotion>
+              </MotionConfig>
             </CardContent>
           </Card>
 
@@ -216,14 +221,18 @@ export function PlaygroundPage({
 
         <CodePreview
           preview={
-            <MiraiCalculator
+            <PlaygroundCalculatorPreview
+              showBackdrop={search.backdrop}
               extensions={extensions}
               mode={activeMode}
               onModeChange={(mode) => onSearchChange({ ...search, mode })}
               theme={search.calculatorTheme}
-              showBackdrop={search.backdrop}
-              height={search.backdrop ? 760 : 680}
+              onThemeChange={(calculatorTheme) => onSearchChange({ ...search, calculatorTheme })}
               title="OpenMirai calculator playground"
+              defaultDefinitions={PLAYGROUND_DEFAULT_DEFINITIONS}
+              defaultGraphingData={PLAYGROUND_GRAPHING_DATA}
+              defaultStatisticsData={PLAYGROUND_STATISTICS_DATA}
+              defaultToolsData={PLAYGROUND_TOOLS_DATA}
             />
           }
           code={snippet}

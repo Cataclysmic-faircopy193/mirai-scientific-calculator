@@ -168,6 +168,7 @@ function ShellContent() {
   )
 }
 
+/** Renders the responsive site chrome, navigation, and current route content. */
 export function SiteShell() {
   return (
     <SiteProvider>

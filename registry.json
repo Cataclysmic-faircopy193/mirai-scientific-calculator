@@ -8,11 +8,7 @@
       "type": "registry:block",
       "title": "Mirai Scientific Calculator",
       "description": "An editable scientific, graphing, statistics, and math tools calculator.",
-      "dependencies": [
-        "@fontsource-variable/inter@^5.3.0",
-        "@openmirai/calculator-core@^0.2.0",
-        "lucide-react@^1.28.0"
-      ],
+      "dependencies": ["@openmirai/calculator-core@^0.2.0", "lucide-react@^1.28.0"],
       "registryDependencies": [
         "badge",
         "button",
@@ -33,11 +29,6 @@
           "target": "@components/mirai-calculator/mirai-calculator.tsx"
         },
         {
-          "path": "../../packages/calculator-registry/src/components/mirai-calculator/calculator-constants.ts",
-          "type": "registry:file",
-          "target": "@components/mirai-calculator/calculator-constants.ts"
-        },
-        {
           "path": "../../packages/calculator-registry/src/components/mirai-calculator/modes/scientific-mode.tsx",
           "type": "registry:component",
           "target": "@components/mirai-calculator/modes/scientific-mode.tsx"
@@ -56,11 +47,6 @@
           "path": "../../packages/calculator-registry/src/components/mirai-calculator/modes/tools-mode.tsx",
           "type": "registry:component",
           "target": "@components/mirai-calculator/modes/tools-mode.tsx"
-        },
-        {
-          "path": "../../packages/calculator-registry/src/components/mirai-calculator/mirai-calculator.css",
-          "type": "registry:file",
-          "target": "@components/mirai-calculator/mirai-calculator.css"
         }
       ]
     }

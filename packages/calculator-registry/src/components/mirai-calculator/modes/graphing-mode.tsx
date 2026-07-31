@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
 } from "react"
 import { Grid3X3, Home, LocateFixed, Play, Plus, Square, X, ZoomIn, ZoomOut } from "lucide-react"
 
@@ -14,14 +13,27 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import {
+  CALCULATOR_CHART_COLORS,
+  DEFAULT_GRAPH_VIEW,
+  collectSliderVariables,
+  resolveCssColorToken,
+} from "@openmirai/calculator-core/configuration"
 import { CalculatorEngine, type AngleMode } from "@openmirai/calculator-core/engine"
 import {
+  clusterGraphPoints,
   compileGraphExpression,
+  fitGraphViewToAspect,
   findExtrema,
   findIntersections,
   findRoots,
+  graphGridStep,
+  projectPointToGraphSegments,
+  sampleExplicitGraphSegments,
+  sampleImplicitContourSegments,
   type CompiledGraphExpression,
   type GraphPoint,
+  type GraphSegment,
   type GraphView,
 } from "@openmirai/calculator-core/graphing"
 import { fitRegression } from "@openmirai/calculator-core/statistics"
@@ -42,13 +54,34 @@ interface ExpressionRow {
 }
 
 interface TableValue {
-  x: string
-  y: string
+  id: number
+  values: Record<number, string>
 }
 
-interface GraphMark extends GraphPoint {
+interface TableColumn {
+  id: number
   label: string
+  color?: string
+  role: "x" | "y"
+}
+
+interface GraphMarkCluster extends GraphPoint {
+  labels: string[]
+  colors: string[]
+  count: number
+}
+
+interface TableGraphPoint extends GraphPoint {
+  rowId: number
+  columnId: number
   color: string
+}
+
+interface GraphTrace extends GraphPoint {
+  color: string
+  source?:
+    | { kind: "expression"; rowId: number }
+    | { kind: "table"; rowId: number; columnId: number }
 }
 
 type ExplicitYExpression = Extract<CompiledGraphExpression, { kind: "explicit" }> & { axis: "y" }
@@ -64,49 +97,108 @@ export interface GraphingModeProps {
   gridVisible: boolean
   onGridVisibleChange: (visible: boolean) => void
   colorScheme?: "light" | "dark"
+  defaultData?: GraphingInitialData
 }
 
-const COLORS = ["#2a9d90", "#3b82f6", "#f59e0b", "#8b5cf6", "#ef4444"]
-const DEFAULT_VIEW: GraphView = { xmin: -8, xmax: 8, ymin: -5, ymax: 7 }
-const DEFAULT_ROWS: ExpressionRow[] = [
-  {
-    id: 1,
-    text: "y = a x² − 5x + 6",
-    color: COLORS[0],
-    visible: true,
-  },
-  { id: 2, text: "y = 2x + 5", color: COLORS[1], visible: true },
-  {
-    id: 3,
-    text: "a = 1",
-    color: "#71717a",
-    visible: true,
-    slider: { min: -2, max: 3, step: 0.1, value: 1, playing: false },
-  },
-  { id: 4, text: "x² + y² = 25", color: COLORS[2], visible: false },
-  { id: 5, text: "(2, 0), (3, 0)", color: COLORS[3], visible: false },
-]
-const DEFAULT_TABLE: TableValue[] = [
-  { x: "0", y: "3" },
-  { x: "1", y: "5.1" },
-  { x: "2", y: "6.8" },
-  { x: "3", y: "9.2" },
-]
-
-function niceStep(span: number): number {
-  const rough = span / 10
-  const power = 10 ** Math.floor(Math.log10(rough))
-  const normalized = rough / power
-  const factor = normalized < 1.5 ? 1 : normalized < 3 ? 2 : normalized < 7 ? 5 : 10
-  return factor * power
+export interface GraphingSliderInitialValue {
+  min: number
+  max: number
+  step: number
+  value: number
+  playing?: boolean
 }
 
-function readCanvasColor(element: Element, name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback
-  const value = getComputedStyle(element).getPropertyValue(name)
-  return value.trim() || fallback
+export interface GraphingExpressionInitialValue {
+  value: string
+  color?: string
+  visible?: boolean
+  slider?: GraphingSliderInitialValue
 }
 
+export interface GraphingTableSeriesInitialValue {
+  label?: string
+  color?: string
+  values: readonly (number | string)[]
+}
+
+export interface GraphingTableInitialValue {
+  xLabel?: string
+  xValues?: readonly (number | string)[]
+  series?: readonly GraphingTableSeriesInitialValue[]
+}
+
+export interface GraphingInitialData {
+  expressions?: readonly GraphingExpressionInitialValue[]
+  table?: GraphingTableInitialValue
+}
+
+const GRAPH_POINT_HIT_RADIUS = 14
+const IMPLICIT_CACHE_LIMIT = 24
+const TABLE_INDEX_COLUMN_WIDTH = 36
+const TABLE_VALUE_COLUMN_WIDTH = 112
+const TABLE_ACTION_COLUMN_WIDTH = 32
+
+function initialExpressionRows(data: GraphingInitialData | undefined): ExpressionRow[] {
+  return (data?.expressions ?? []).map((expression, index) => ({
+    id: index + 1,
+    text: expression.value,
+    color: expression.color ?? CALCULATOR_CHART_COLORS[index % CALCULATOR_CHART_COLORS.length],
+    visible: expression.visible ?? true,
+    slider: expression.slider
+      ? { ...expression.slider, playing: expression.slider.playing ?? false }
+      : undefined,
+  }))
+}
+
+function initialTableState(data: GraphingInitialData | undefined): {
+  columns: TableColumn[]
+  rows: TableValue[]
+} {
+  const table = data?.table
+  const series = table?.series?.length
+    ? table.series
+    : [{ label: "y₁", color: CALCULATOR_CHART_COLORS[2], values: [] }]
+  const columns: TableColumn[] = [
+    { id: 1, label: table?.xLabel ?? "x₁", role: "x" },
+    ...series.map((item, index) => ({
+      id: index + 2,
+      label: item.label ?? `y${String(index + 1)}`,
+      color: item.color ?? CALCULATOR_CHART_COLORS[(index + 2) % CALCULATOR_CHART_COLORS.length],
+      role: "y" as const,
+    })),
+  ]
+  const rowCount = Math.max(
+    table?.xValues?.length ?? 0,
+    ...series.map((item) => item.values.length)
+  )
+  const rows = Array.from({ length: rowCount }, (_, rowIndex) => ({
+    id: rowIndex + 1,
+    values: Object.fromEntries([
+      [1, String(table?.xValues?.[rowIndex] ?? "")],
+      ...series.map((item, seriesIndex) => [seriesIndex + 2, String(item.values[rowIndex] ?? "")]),
+    ]),
+  }))
+  return { columns, rows }
+}
+
+function readCanvasColor(element: Element, name: string): string {
+  const computed = getComputedStyle(element)
+  const value = computed.getPropertyValue(name).trim()
+  return value || (name === "--background" ? computed.backgroundColor : computed.color)
+}
+
+function resolveCanvasPaint(element: Element, token: string): string {
+  const computed = getComputedStyle(element)
+  const properties = Object.fromEntries(
+    CALCULATOR_CHART_COLORS.map((color) => {
+      const property = color.slice(4, -1)
+      return [property, computed.getPropertyValue(property)]
+    })
+  )
+  return resolveCssColorToken(token, properties, computed.color)
+}
+
+/** Renders the interactive graph workspace with expressions, tables, tracing, and analysis. */
 export function GraphingMode({
   angleMode,
   ans,
@@ -118,44 +210,98 @@ export function GraphingMode({
   gridVisible,
   onGridVisibleChange,
   colorScheme = "light",
+  defaultData,
 }: GraphingModeProps) {
-  const [rows, setRows] = useState<ExpressionRow[]>(DEFAULT_ROWS)
-  const [table, setTable] = useState<TableValue[]>(DEFAULT_TABLE)
-  const [trace, setTrace] = useState<(GraphPoint & { color: string }) | null>(null)
-  const nextRowId = useRef(6)
+  const [initialTable] = useState(() => initialTableState(defaultData))
+  const [rows, setRows] = useState<ExpressionRow[]>(() => initialExpressionRows(defaultData))
+  const rowsRef = useRef(rows)
+  const [tableColumns, setTableColumns] = useState<TableColumn[]>(initialTable.columns)
+  const [table, setTable] = useState<TableValue[]>(initialTable.rows)
+  const tableMinimumWidth =
+    TABLE_INDEX_COLUMN_WIDTH +
+    tableColumns.length * TABLE_VALUE_COLUMN_WIDTH +
+    TABLE_ACTION_COLUMN_WIDTH
+  const [trace, setTrace] = useState<GraphTrace | null>(null)
+  const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [interacting, setInteracting] = useState(false)
+  const [graphSize, setGraphSize] = useState({ width: 0, height: 0 })
+  const nextRowId = useRef(rows.length + 1)
+  const nextTableRowId = useRef(table.length + 1)
+  const nextTableColumnId = useRef(tableColumns.length + 1)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const graphHostRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{
-    pointerId: number
-    startX: number
-    startY: number
-    view: GraphView
-    moved: boolean
-  } | null>(null)
+  const renderedSegmentsRef = useRef(new Map<number, GraphSegment[]>())
+  const implicitCacheRef = useRef(
+    new Map<
+      number,
+      {
+        residual: (x: number, y: number) => number
+        key: string
+        segments: ReturnType<typeof sampleImplicitContourSegments>
+      }
+    >()
+  )
+  const interactionTimerRef = useRef<number | null>(null)
+  const dragRef = useRef<
+    | {
+        kind: "view"
+        pointerId: number
+        startX: number
+        startY: number
+        view: GraphView
+        renderedView: GraphView
+        moved: boolean
+      }
+    | { kind: "trace"; pointerId: number; rowId: number; color: string }
+    | { kind: "table"; pointerId: number; rowId: number; columnId: number; color: string }
+    | null
+  >(null)
   const formatNumber = useCallback(
     (value: number) => formatValue(Number.isFinite(value) ? Number(value.toPrecision(7)) : value),
     [formatValue]
   )
+  const commitRows = useCallback(
+    (update: ExpressionRow[] | ((current: ExpressionRow[]) => ExpressionRow[])) => {
+      const nextRows = typeof update === "function" ? update(rowsRef.current) : update
+      rowsRef.current = nextRows
+      setRows(nextRows)
+      onVariablesChange(
+        collectSliderVariables(
+          nextRows.map((row) => ({ expression: row.text, value: row.slider?.value }))
+        )
+      )
+    },
+    [onVariablesChange]
+  )
+  const tracePosition = useMemo(() => {
+    if (!trace || graphSize.width <= 0 || graphSize.height <= 0) return null
+    const renderedView = fitGraphViewToAspect(view, graphSize.width, graphSize.height)
+    return {
+      x:
+        ((trace.x - renderedView.xmin) / (renderedView.xmax - renderedView.xmin)) * graphSize.width,
+      y:
+        graphSize.height -
+        ((trace.y - renderedView.ymin) / (renderedView.ymax - renderedView.ymin)) *
+          graphSize.height,
+      labelOnLeft: trace.x > (renderedView.xmin + renderedView.xmax) / 2,
+      labelBelow: trace.y > renderedView.ymax - (renderedView.ymax - renderedView.ymin) * 0.12,
+    }
+  }, [graphSize.height, graphSize.width, trace, view])
 
-  const setView = (next: GraphView | ((current: GraphView) => GraphView)) => {
-    onViewChange(typeof next === "function" ? next(view) : next)
-  }
+  const setView = useCallback(
+    (next: GraphView | ((current: GraphView) => GraphView)) => {
+      onViewChange(typeof next === "function" ? next(view) : next)
+    },
+    [onViewChange, view]
+  )
 
   const variables = useMemo(
     () =>
-      Object.fromEntries(
-        rows.flatMap((row) => {
-          if (!row.slider) return []
-          const name = row.text.split("=")[0]?.trim().toLowerCase()
-          return /^[a-z]$/.test(name) ? [[name, row.slider.value]] : []
-        })
+      collectSliderVariables(
+        rows.map((row) => ({ expression: row.text, value: row.slider?.value }))
       ),
     [rows]
   )
-
-  useEffect(() => {
-    onVariablesChange(variables)
-  }, [onVariablesChange, variables])
 
   const engine = useMemo(
     () =>
@@ -177,24 +323,36 @@ export function GraphingMode({
     [engine, rows]
   )
 
-  const tablePoints = useMemo(
-    () =>
-      table
-        .map(({ x, y }) => ({ x: Number(x), y: Number(y) }))
-        .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)),
-    [table]
-  )
-  const tableRegression = useMemo(
-    () =>
-      fitRegression(
-        tablePoints.map((point) => point.x),
-        tablePoints.map((point) => point.y),
-        "linear"
-      ),
-    [tablePoints]
-  )
+  const tableSeries = useMemo(() => {
+    const xColumn = tableColumns.find((column) => column.role === "x")
+    if (!xColumn) return []
+    return tableColumns
+      .filter(
+        (column): column is TableColumn & { color: string } => column.role === "y" && !!column.color
+      )
+      .map((column) => {
+        const points = table.flatMap<TableGraphPoint>((row) => {
+          const x = Number(row.values[xColumn.id])
+          const y = Number(row.values[column.id])
+          return Number.isFinite(x) && Number.isFinite(y)
+            ? [{ x, y, rowId: row.id, columnId: column.id, color: column.color }]
+            : []
+        })
+        return {
+          column,
+          points,
+          regression: fitRegression(
+            points.map((point) => point.x),
+            points.map((point) => point.y),
+            "linear"
+          ),
+        }
+      })
+  }, [table, tableColumns])
+  const tablePoints = useMemo(() => tableSeries.flatMap((series) => series.points), [tableSeries])
 
-  const marks = useMemo<GraphMark[]>(() => {
+  const marks = useMemo<GraphMarkCluster[]>(() => {
+    if (!analysisOpen) return []
     const visibleFunctions = compiled.filter(
       (
         item
@@ -203,7 +361,7 @@ export function GraphingMode({
         expression: ExplicitYExpression
       } => item.row.visible && item.expression.kind === "explicit" && item.expression.axis === "y"
     )
-    const result: GraphMark[] = []
+    const result: Array<GraphPoint & { label: string; color: string }> = []
 
     for (const item of visibleFunctions) {
       try {
@@ -235,7 +393,7 @@ export function GraphingMode({
             result.push({
               ...point,
               label: "intersection",
-              color: COLORS[4],
+              color: CALCULATOR_CHART_COLORS[4],
             })
           }
         } catch {
@@ -243,8 +401,14 @@ export function GraphingMode({
         }
       }
     }
-    return result.slice(0, 50)
-  }, [compiled, view.xmax, view.xmin])
+    const tolerance = Math.max(view.xmax - view.xmin, view.ymax - view.ymin) * 1e-6
+    return clusterGraphPoints(result.slice(0, 50), tolerance).map(({ point, indexes }) => ({
+      ...point,
+      labels: [...new Set(indexes.map((index) => result[index].label))],
+      colors: [...new Set(indexes.map((index) => result[index].color))],
+      count: indexes.length,
+    }))
+  }, [analysisOpen, compiled, view.xmax, view.xmin, view.ymax, view.ymin])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -253,8 +417,11 @@ export function GraphingMode({
 
     const draw = () => {
       const bounds = host.getBoundingClientRect()
-      const width = Math.max(320, Math.floor(bounds.width))
-      const height = Math.max(300, Math.floor(bounds.height))
+      const width = Math.max(1, Math.floor(bounds.width))
+      const height = Math.max(1, Math.floor(bounds.height))
+      setGraphSize((current) =>
+        current.width === width && current.height === height ? current : { width, height }
+      )
       const ratio = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width = width * ratio
       canvas.height = height * ratio
@@ -264,25 +431,33 @@ export function GraphingMode({
       if (!context) return
       context.setTransform(ratio, 0, 0, ratio, 0, 0)
 
-      const background = readCanvasColor(canvas, "--background", "#ffffff")
-      const border = readCanvasColor(canvas, "--border", "#e4e4e7")
-      const muted = readCanvasColor(canvas, "--muted-foreground", "#71717a")
-      const xToCanvas = (x: number) => ((x - view.xmin) / (view.xmax - view.xmin)) * width
-      const yToCanvas = (y: number) => height - ((y - view.ymin) / (view.ymax - view.ymin)) * height
+      const background = readCanvasColor(canvas, "--background")
+      const border = readCanvasColor(canvas, "--border")
+      const muted = readCanvasColor(canvas, "--muted-foreground")
+      const renderedView = fitGraphViewToAspect(view, width, height)
+      const xToCanvas = (x: number) =>
+        ((x - renderedView.xmin) / (renderedView.xmax - renderedView.xmin)) * width
+      const yToCanvas = (y: number) =>
+        height - ((y - renderedView.ymin) / (renderedView.ymax - renderedView.ymin)) * height
+      const renderedSegments = new Map<number, GraphSegment[]>()
 
       context.clearRect(0, 0, width, height)
       context.fillStyle = background
       context.fillRect(0, 0, width, height)
 
       if (gridVisible) {
-        const xStep = niceStep(view.xmax - view.xmin)
-        const yStep = niceStep(view.ymax - view.ymin)
+        const xStep = graphGridStep(renderedView.xmax - renderedView.xmin)
+        const yStep = graphGridStep(renderedView.ymax - renderedView.ymin)
         context.strokeStyle = border
         context.lineWidth = 1
         context.font = "10px system-ui, -apple-system, sans-serif"
         context.fillStyle = muted
 
-        for (let x = Math.ceil(view.xmin / xStep) * xStep; x <= view.xmax; x += xStep) {
+        for (
+          let x = Math.ceil(renderedView.xmin / xStep) * xStep;
+          x <= renderedView.xmax;
+          x += xStep
+        ) {
           const pixel = xToCanvas(x)
           context.beginPath()
           context.moveTo(pixel, 0)
@@ -292,7 +467,11 @@ export function GraphingMode({
             context.fillText(formatNumber(x), pixel + 4, yToCanvas(0) + 12)
           }
         }
-        for (let y = Math.ceil(view.ymin / yStep) * yStep; y <= view.ymax; y += yStep) {
+        for (
+          let y = Math.ceil(renderedView.ymin / yStep) * yStep;
+          y <= renderedView.ymax;
+          y += yStep
+        ) {
           const pixel = yToCanvas(y)
           context.beginPath()
           context.moveTo(0, pixel)
@@ -306,13 +485,13 @@ export function GraphingMode({
 
       context.strokeStyle = muted
       context.lineWidth = 1.3
-      if (view.ymin <= 0 && view.ymax >= 0) {
+      if (renderedView.ymin <= 0 && renderedView.ymax >= 0) {
         context.beginPath()
         context.moveTo(0, yToCanvas(0))
         context.lineTo(width, yToCanvas(0))
         context.stroke()
       }
-      if (view.xmin <= 0 && view.xmax >= 0) {
+      if (renderedView.xmin <= 0 && renderedView.xmax >= 0) {
         context.beginPath()
         context.moveTo(xToCanvas(0), 0)
         context.lineTo(xToCanvas(0), height)
@@ -321,44 +500,28 @@ export function GraphingMode({
 
       for (const { row, expression } of compiled) {
         if (!row.visible || expression.kind === "invalid") continue
-        context.strokeStyle = row.color
-        context.fillStyle = row.color
+        const rowColor = resolveCanvasPaint(canvas, row.color)
+        context.strokeStyle = rowColor
+        context.fillStyle = rowColor
         context.lineWidth = 2.2
+        context.lineCap = "round"
+        context.lineJoin = "round"
 
         if (expression.kind === "explicit") {
-          const count = expression.axis === "y" ? width : height
-          let drawing = false
+          const segments = sampleExplicitGraphSegments(
+            expression.evaluate,
+            expression.axis,
+            renderedView,
+            width,
+            height
+          )
           context.beginPath()
-          for (let pixel = 0; pixel <= count; pixel += 1) {
-            const input =
-              expression.axis === "y"
-                ? view.xmin + (pixel / width) * (view.xmax - view.xmin)
-                : view.ymax - (pixel / height) * (view.ymax - view.ymin)
-            try {
-              const output = expression.evaluate(input)
-              const canvasX = expression.axis === "y" ? pixel : xToCanvas(output)
-              const canvasY = expression.axis === "y" ? yToCanvas(output) : pixel
-              const valid =
-                Number.isFinite(output) &&
-                canvasX > -height * 3 &&
-                canvasX < width + height * 3 &&
-                canvasY > -height * 3 &&
-                canvasY < height * 4
-              if (!valid) {
-                drawing = false
-                continue
-              }
-              if (!drawing) {
-                context.moveTo(canvasX, canvasY)
-                drawing = true
-              } else {
-                context.lineTo(canvasX, canvasY)
-              }
-            } catch {
-              drawing = false
-            }
+          for (const segment of segments) {
+            context.moveTo(xToCanvas(segment.from.x), yToCanvas(segment.from.y))
+            context.lineTo(xToCanvas(segment.to.x), yToCanvas(segment.to.y))
           }
           context.stroke()
+          renderedSegments.set(row.id, segments)
         } else if (expression.kind === "points") {
           for (const point of expression.points) {
             context.beginPath()
@@ -366,40 +529,64 @@ export function GraphingMode({
             context.fill()
           }
         } else if (expression.kind === "implicit") {
-          const columns = 90
-          const rowsCount = 65
-          const cellWidth = width / columns
-          const cellHeight = height / rowsCount
-          for (let column = 0; column < columns; column += 1) {
-            for (let rowIndex = 0; rowIndex < rowsCount; rowIndex += 1) {
-              const x0 = view.xmin + (column / columns) * (view.xmax - view.xmin)
-              const x1 = view.xmin + ((column + 1) / columns) * (view.xmax - view.xmin)
-              const y0 = view.ymax - (rowIndex / rowsCount) * (view.ymax - view.ymin)
-              const y1 = view.ymax - ((rowIndex + 1) / rowsCount) * (view.ymax - view.ymin)
-              try {
-                const values = [
-                  expression.residual(x0, y0),
-                  expression.residual(x1, y0),
-                  expression.residual(x1, y1),
-                  expression.residual(x0, y1),
-                ]
-                if (values.every((value) => value >= 0) || values.every((value) => value < 0)) {
-                  continue
-                }
-                context.beginPath()
-                context.moveTo(column * cellWidth, (rowIndex + 0.5) * cellHeight)
-                context.lineTo((column + 1) * cellWidth, (rowIndex + 0.5) * cellHeight)
-                context.stroke()
-              } catch {
-                // Skip cells outside the expression domain.
-              }
+          const columns = interacting
+            ? Math.max(36, Math.min(72, Math.ceil(width / 14)))
+            : Math.max(48, Math.min(120, Math.ceil(width / 9)))
+          const rowsCount = interacting
+            ? Math.max(32, Math.min(56, Math.ceil(height / 14)))
+            : Math.max(40, Math.min(96, Math.ceil(height / 9)))
+          const cacheKey = [
+            renderedView.xmin,
+            renderedView.xmax,
+            renderedView.ymin,
+            renderedView.ymax,
+            columns,
+            rowsCount,
+          ].join(":")
+          const cached = implicitCacheRef.current.get(row.id)
+          const segments =
+            cached?.residual === expression.residual && cached.key === cacheKey
+              ? cached.segments
+              : sampleImplicitContourSegments(expression.residual, renderedView, columns, rowsCount)
+          if (segments !== cached?.segments) {
+            implicitCacheRef.current.set(row.id, {
+              residual: expression.residual,
+              key: cacheKey,
+              segments,
+            })
+            if (implicitCacheRef.current.size > IMPLICIT_CACHE_LIMIT) {
+              const oldestRowId = implicitCacheRef.current.keys().next().value
+              if (typeof oldestRowId === "number") implicitCacheRef.current.delete(oldestRowId)
             }
           }
+          const isolatedPoints: GraphPoint[] = []
+          context.beginPath()
+          for (const segment of segments) {
+            const fromX = xToCanvas(segment.from.x)
+            const fromY = yToCanvas(segment.from.y)
+            const toX = xToCanvas(segment.to.x)
+            const toY = yToCanvas(segment.to.y)
+            if (segment.from.x === segment.to.x && segment.from.y === segment.to.y) {
+              isolatedPoints.push({ x: fromX, y: fromY })
+              continue
+            }
+            context.moveTo(fromX, fromY)
+            context.lineTo(toX, toY)
+          }
+          context.stroke()
+          for (const point of isolatedPoints) {
+            context.beginPath()
+            context.arc(point.x, point.y, 2.2, 0, Math.PI * 2)
+            context.fill()
+          }
+          renderedSegments.set(row.id, segments)
         }
       }
 
-      context.fillStyle = COLORS[2]
+      renderedSegmentsRef.current = renderedSegments
+
       for (const point of tablePoints) {
+        context.fillStyle = resolveCanvasPaint(canvas, point.color)
         context.beginPath()
         context.arc(xToCanvas(point.x), yToCanvas(point.y), 4.5, 0, Math.PI * 2)
         context.fill()
@@ -407,94 +594,278 @@ export function GraphingMode({
 
       for (const mark of marks) {
         context.fillStyle = background
-        context.strokeStyle = mark.color
+        context.strokeStyle = resolveCanvasPaint(
+          canvas,
+          mark.colors.at(-1) ?? CALCULATOR_CHART_COLORS[4]
+        )
         context.lineWidth = 2
         context.beginPath()
         context.arc(xToCanvas(mark.x), yToCanvas(mark.y), 5, 0, Math.PI * 2)
         context.fill()
         context.stroke()
       }
-
-      if (trace) {
-        context.fillStyle = trace.color
-        context.beginPath()
-        context.arc(xToCanvas(trace.x), yToCanvas(trace.y), 6, 0, Math.PI * 2)
-        context.fill()
-      }
     }
 
-    draw()
-    const observer = new ResizeObserver(draw)
+    let frame = window.requestAnimationFrame(draw)
+    const scheduleDraw = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(draw)
+    }
+    const observer = new ResizeObserver(scheduleDraw)
     observer.observe(host)
-    return () => observer.disconnect()
-  }, [colorScheme, compiled, formatNumber, gridVisible, marks, tablePoints, trace, view])
+    return () => {
+      window.cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [colorScheme, compiled, formatNumber, gridVisible, interacting, marks, tablePoints, view])
+
+  const hasPlayingSliders = rows.some((row) => row.slider?.playing)
 
   useEffect(() => {
-    const timers = rows
-      .filter((row) => row.slider?.playing)
-      .map((row) =>
-        window.setInterval(() => {
-          setRows((currentRows) =>
-            currentRows.map((current) => {
-              if (current.id !== row.id || !current.slider) return current
-              const next = current.slider.value + current.slider.step
-              return {
-                ...current,
-                slider: {
-                  ...current.slider,
-                  value: next > current.slider.max ? current.slider.min : next,
-                },
-              }
-            })
-          )
-        }, 100)
+    if (!hasPlayingSliders) return
+    const timer = window.setInterval(() => {
+      commitRows((currentRows) =>
+        currentRows.map((current) => {
+          if (!current.slider?.playing) return current
+          const next = current.slider.value + current.slider.step
+          return {
+            ...current,
+            slider: {
+              ...current.slider,
+              value: next > current.slider.max ? current.slider.min : next,
+            },
+          }
+        })
       )
-    return () => timers.forEach(window.clearInterval)
-  }, [rows])
+    }, 100)
+    return () => window.clearInterval(timer)
+  }, [commitRows, hasPlayingSliders])
 
-  const zoom = (factor: number) => {
-    setView((current) => {
-      const centerX = (current.xmin + current.xmax) / 2
-      const centerY = (current.ymin + current.ymax) / 2
-      const halfWidth = ((current.xmax - current.xmin) * factor) / 2
-      const halfHeight = ((current.ymax - current.ymin) * factor) / 2
-      return {
-        xmin: centerX - halfWidth,
-        xmax: centerX + halfWidth,
-        ymin: centerY - halfHeight,
-        ymax: centerY + halfHeight,
+  const zoom = useCallback(
+    (factor: number) => {
+      setView((current) => {
+        const centerX = (current.xmin + current.xmax) / 2
+        const centerY = (current.ymin + current.ymax) / 2
+        const halfWidth = ((current.xmax - current.xmin) * factor) / 2
+        const halfHeight = ((current.ymax - current.ymin) * factor) / 2
+        return {
+          xmin: centerX - halfWidth,
+          xmax: centerX + halfWidth,
+          ymin: centerY - halfHeight,
+          ymax: centerY + halfHeight,
+        }
+      })
+    },
+    [setView]
+  )
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setInteracting(true)
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current)
       }
-    })
-  }
+      interactionTimerRef.current = window.setTimeout(() => {
+        setInteracting(false)
+        interactionTimerRef.current = null
+      }, 140)
+      zoom(event.deltaY > 0 ? 1.12 : 1 / 1.12)
+    }
+
+    canvas.addEventListener("wheel", handleWheel, { passive: false })
+    return () => {
+      canvas.removeEventListener("wheel", handleWheel)
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current)
+      }
+    }
+  }, [zoom])
 
   const graphCoordinates = (clientX: number, clientY: number): GraphPoint => {
     const bounds = canvasRef.current!.getBoundingClientRect()
+    const renderedView = fitGraphViewToAspect(view, bounds.width, bounds.height)
     return {
-      x: view.xmin + ((clientX - bounds.left) / bounds.width) * (view.xmax - view.xmin),
-      y: view.ymax - ((clientY - bounds.top) / bounds.height) * (view.ymax - view.ymin),
+      x:
+        renderedView.xmin +
+        ((clientX - bounds.left) / bounds.width) * (renderedView.xmax - renderedView.xmin),
+      y:
+        renderedView.ymax -
+        ((clientY - bounds.top) / bounds.height) * (renderedView.ymax - renderedView.ymin),
     }
   }
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const measuredSize = {
+      width: Math.max(1, Math.floor(bounds.width)),
+      height: Math.max(1, Math.floor(bounds.height)),
+    }
+    setGraphSize((current) =>
+      current.width === measuredSize.width && current.height === measuredSize.height
+        ? current
+        : measuredSize
+    )
+    const renderedView = fitGraphViewToAspect(view, bounds.width, bounds.height)
+    const graphPoint = graphCoordinates(event.clientX, event.clientY)
+    const pointerX = event.clientX - bounds.left
+    const pointerY = event.clientY - bounds.top
+    const xToCanvas = (x: number) =>
+      ((x - renderedView.xmin) / (renderedView.xmax - renderedView.xmin)) * bounds.width
+    const yToCanvas = (y: number) =>
+      bounds.height -
+      ((y - renderedView.ymin) / (renderedView.ymax - renderedView.ymin)) * bounds.height
+
+    const tablePoint = [...tablePoints]
+      .reverse()
+      .find(
+        (point) =>
+          Math.hypot(xToCanvas(point.x) - pointerX, yToCanvas(point.y) - pointerY) <=
+          GRAPH_POINT_HIT_RADIUS
+      )
+    if (tablePoint) {
+      setTrace({
+        ...tablePoint,
+        source: { kind: "table", rowId: tablePoint.rowId, columnId: tablePoint.columnId },
+      })
+      dragRef.current = {
+        kind: "table",
+        pointerId: event.pointerId,
+        rowId: tablePoint.rowId,
+        columnId: tablePoint.columnId,
+        color: tablePoint.color,
+      }
+      setInteracting(true)
+      return
+    }
+
+    let closestCurve: { row: ExpressionRow; point: GraphPoint } | null = null
+    let closestDistance = GRAPH_POINT_HIT_RADIUS + 1
+    for (const item of compiled) {
+      if (
+        !item.row.visible ||
+        (item.expression.kind !== "explicit" && item.expression.kind !== "implicit")
+      ) {
+        continue
+      }
+      const renderedSegments = renderedSegmentsRef.current.get(item.row.id)
+      const fallbackSegments =
+        item.expression.kind === "explicit"
+          ? sampleExplicitGraphSegments(
+              item.expression.evaluate,
+              item.expression.axis,
+              renderedView,
+              bounds.width,
+              bounds.height
+            )
+          : []
+      if (!renderedSegments && fallbackSegments.length > 0) {
+        renderedSegmentsRef.current.set(item.row.id, fallbackSegments)
+      }
+      const projection = projectPointToGraphSegments(
+        renderedSegments ?? fallbackSegments,
+        graphPoint,
+        renderedView,
+        bounds.width,
+        bounds.height
+      )
+      if (projection && projection.distance <= closestDistance) {
+        closestCurve = { row: item.row, point: projection.point }
+        closestDistance = projection.distance
+      }
+    }
+    if (closestCurve) {
+      setTrace({
+        ...closestCurve.point,
+        color: closestCurve.row.color,
+        source: { kind: "expression", rowId: closestCurve.row.id },
+      })
+      dragRef.current = {
+        kind: "trace",
+        pointerId: event.pointerId,
+        rowId: closestCurve.row.id,
+        color: closestCurve.row.color,
+      }
+      setInteracting(true)
+      return
+    }
+
     dragRef.current = {
+      kind: "view",
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       view,
+      renderedView,
       moved: false,
     }
+    setInteracting(true)
   }
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current
     const bounds = event.currentTarget.getBoundingClientRect()
     if (!drag || drag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const point = graphCoordinates(event.clientX, event.clientY)
+
+    if (drag.kind === "trace") {
+      const renderedView = fitGraphViewToAspect(view, bounds.width, bounds.height)
+      const projection = projectPointToGraphSegments(
+        renderedSegmentsRef.current.get(drag.rowId) ?? [],
+        point,
+        renderedView,
+        bounds.width,
+        bounds.height
+      )
+      if (projection) {
+        setTrace({
+          ...projection.point,
+          color: drag.color,
+          source: { kind: "expression", rowId: drag.rowId },
+        })
+      }
+      return
+    }
+
+    if (drag.kind === "table") {
+      const xColumn = tableColumns.find((column) => column.role === "x")
+      if (!xColumn) return
+      const xValue = String(Number(point.x.toPrecision(10)))
+      const yValue = String(Number(point.y.toPrecision(10)))
+      setTable((current) =>
+        current.map((row) =>
+          row.id === drag.rowId
+            ? {
+                ...row,
+                values: {
+                  ...row.values,
+                  [xColumn.id]: xValue,
+                  [drag.columnId]: yValue,
+                },
+              }
+            : row
+        )
+      )
+      setTrace({
+        x: point.x,
+        y: point.y,
+        color: drag.color,
+        source: { kind: "table", rowId: drag.rowId, columnId: drag.columnId },
+      })
+      return
+    }
+
     const dx = event.clientX - drag.startX
     const dy = event.clientY - drag.startY
     if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
-    const xShift = (dx / bounds.width) * (drag.view.xmax - drag.view.xmin)
-    const yShift = (dy / bounds.height) * (drag.view.ymax - drag.view.ymin)
+    const xShift = (dx / bounds.width) * (drag.renderedView.xmax - drag.renderedView.xmin)
+    const yShift = (dy / bounds.height) * (drag.renderedView.ymax - drag.renderedView.ymin)
     setView({
       xmin: drag.view.xmin - xShift,
       xmax: drag.view.xmax - xShift,
@@ -504,61 +875,79 @@ export function GraphingMode({
   }
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current
+    const completedDrag = dragRef.current
     dragRef.current = null
-    if (!drag || drag.moved) return
-    const point = graphCoordinates(event.clientX, event.clientY)
-    const firstFunction = compiled.find(
-      (
-        item
-      ): item is {
-        row: ExpressionRow
-        expression: ExplicitYExpression
-      } => item.row.visible && item.expression.kind === "explicit" && item.expression.axis === "y"
-    )
-    if (!firstFunction) return
-    try {
-      const y = firstFunction.expression.evaluate(point.x)
-      if (Number.isFinite(y)) {
-        setTrace({ x: point.x, y, color: firstFunction.row.color })
-      }
-    } catch {
-      setTrace(null)
+    if (completedDrag?.kind === "trace" || completedDrag?.kind === "table") setTrace(null)
+    setInteracting(false)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
     }
   }
 
-  const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
-    event.preventDefault()
-    zoom(event.deltaY > 0 ? 1.12 : 1 / 1.12)
-  }
-
   const updateRow = (id: number, patch: Partial<ExpressionRow>) => {
-    setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+    commitRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)))
   }
 
   const addExpression = () => {
     const id = nextRowId.current
     nextRowId.current += 1
-    setRows((current) => [
+    commitRows((current) => [
       ...current,
       {
         id,
         text: "",
-        color: COLORS[(id - 1) % COLORS.length],
+        color: CALCULATOR_CHART_COLORS[(id - 1) % CALCULATOR_CHART_COLORS.length],
         visible: true,
       },
     ])
   }
 
-  const updateCell = (index: number, key: keyof TableValue, value: string) => {
+  const updateCell = (rowId: number, columnId: number, value: string) => {
     setTable((current) =>
-      current.map((row, currentIndex) => (currentIndex === index ? { ...row, [key]: value } : row))
+      current.map((row) =>
+        row.id === rowId ? { ...row, values: { ...row.values, [columnId]: value } } : row
+      )
+    )
+  }
+
+  const addTableRow = () => {
+    const id = nextTableRowId.current
+    nextTableRowId.current += 1
+    setTable((current) => [
+      ...current,
+      { id, values: Object.fromEntries(tableColumns.map((column) => [column.id, ""])) },
+    ])
+  }
+
+  const addTableVariable = () => {
+    const id = nextTableColumnId.current
+    nextTableColumnId.current += 1
+    const variableIndex = tableColumns.filter((column) => column.role === "y").length + 1
+    setTableColumns((current) => [
+      ...current,
+      {
+        id,
+        label: `y${String(variableIndex)}`,
+        color: CALCULATOR_CHART_COLORS[(variableIndex + 1) % CALCULATOR_CHART_COLORS.length],
+        role: "y",
+      },
+    ])
+  }
+
+  const removeTableVariable = (columnId: number) => {
+    setTableColumns((current) => current.filter((column) => column.id !== columnId))
+    setTable((current) =>
+      current.map((row) => {
+        const values = { ...row.values }
+        delete values[columnId]
+        return { ...row, values }
+      })
     )
   }
 
   return (
-    <div className="mirai-graphing-layout grid min-h-0 flex-1 overflow-hidden">
-      <aside className="mirai-graphing-sidebar flex min-h-0 flex-col bg-card">
+    <div className="mirai-graphing-layout grid min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)] overflow-hidden @max-[699px]:grid-cols-1 @max-[699px]:overflow-y-auto">
+      <aside className="mirai-graphing-sidebar flex min-h-0 flex-col border-r bg-card @max-[699px]:order-2 @max-[699px]:min-h-[300px] @max-[699px]:max-h-[50%] @max-[699px]:border-r-0 @max-[699px]:border-b">
         <ScrollArea className="min-h-0 flex-1">
           <div className="divide-y">
             {compiled.map(({ row, expression }) => (
@@ -589,7 +978,7 @@ export function GraphingMode({
                       variant="ghost"
                       size="icon-sm"
                       onClick={() =>
-                        setRows((current) => current.filter((item) => item.id !== row.id))
+                        commitRows((current) => current.filter((item) => item.id !== row.id))
                       }
                       aria-label={`Delete expression ${row.id}`}
                       className="text-muted-foreground hover:text-destructive"
@@ -664,16 +1053,24 @@ export function GraphingMode({
             )}
 
             <section className="p-3">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="size-3 rounded-sm border-2 border-amber-500 bg-amber-500/10" />
-                <h3 className="text-sm font-semibold">Table 1</h3>
-                <div className="flex-1" />
+              <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+                <h3 className="mr-auto text-sm font-semibold">Table 1</h3>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setTable((current) => [...current, { x: "", y: "" }])}
+                  onClick={addTableVariable}
                   className="h-7 rounded-md text-xs"
                 >
+                  <Plus />
+                  Variable
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addTableRow}
+                  className="h-7 rounded-md text-xs"
+                >
+                  <Plus />
                   Add row
                 </Button>
                 <Button
@@ -685,69 +1082,154 @@ export function GraphingMode({
                   Clear
                 </Button>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_24px] items-center gap-1.5">
-                <span className="px-2 text-xs font-semibold text-muted-foreground">x₁</span>
-                <span className="px-2 text-xs font-semibold text-muted-foreground">y₁</span>
-                <span />
-                {table.map((row, index) => (
-                  <div className="contents" key={index}>
-                    <Input
-                      value={row.x}
-                      onChange={(event) => updateCell(index, "x", event.target.value)}
-                      aria-label={`Table x value ${index + 1}`}
-                      className="h-[30px] rounded-md px-2 font-mono text-sm"
-                    />
-                    <Input
-                      value={row.y}
-                      onChange={(event) => updateCell(index, "y", event.target.value)}
-                      aria-label={`Table y value ${index + 1}`}
-                      className="h-[30px] rounded-md px-2 font-mono text-sm"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() =>
-                        setTable((current) =>
-                          current.filter((_, currentIndex) => currentIndex !== index)
-                        )
-                      }
-                      aria-label={`Remove table row ${index + 1}`}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                ))}
+              <div className="mirai-graphing-table-scroll min-w-0 max-w-full overflow-x-auto overscroll-x-contain border-y [contain:inline-size]">
+                <table
+                  className="w-full table-fixed border-collapse text-sm"
+                  style={{ minWidth: tableMinimumWidth }}
+                >
+                  <colgroup>
+                    <col className="w-9" />
+                    {tableColumns.map((column) => (
+                      <col className="w-28" key={column.id} />
+                    ))}
+                    <col className="w-8" />
+                  </colgroup>
+                  <thead className="bg-muted/35">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="w-9 border-r px-2 py-1 text-center font-mono text-xs text-muted-foreground"
+                      >
+                        #
+                      </th>
+                      {tableColumns.map((column) => (
+                        <th key={column.id} scope="col" className="border-r p-0 font-normal">
+                          <div className="flex items-center">
+                            {column.color && (
+                              <span
+                                aria-hidden="true"
+                                className="ml-2 size-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: column.color }}
+                              />
+                            )}
+                            <Input
+                              value={column.label}
+                              onChange={(event) =>
+                                setTableColumns((current) =>
+                                  current.map((item) =>
+                                    item.id === column.id
+                                      ? { ...item, label: event.target.value }
+                                      : item
+                                  )
+                                )
+                              }
+                              aria-label={`Table variable ${column.label}`}
+                              className="h-8 w-full min-w-0 rounded-none border-0 bg-transparent px-2 font-mono text-sm font-semibold shadow-none focus-visible:ring-0 dark:bg-transparent"
+                            />
+                            {column.role === "y" && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => removeTableVariable(column.id)}
+                                aria-label={`Remove variable ${column.label}`}
+                                className="rounded-none text-muted-foreground hover:text-destructive"
+                              >
+                                <X />
+                              </Button>
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                      <th scope="col" className="w-8">
+                        <span className="sr-only">Row actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.map((row, rowIndex) => (
+                      <tr key={row.id} className="border-t">
+                        <th
+                          scope="row"
+                          className="border-r px-2 text-center font-mono text-xs font-normal text-muted-foreground"
+                        >
+                          {rowIndex + 1}
+                        </th>
+                        {tableColumns.map((column) => (
+                          <td key={column.id} className="border-r p-0">
+                            <Input
+                              value={row.values[column.id] ?? ""}
+                              onChange={(event) =>
+                                updateCell(row.id, column.id, event.target.value)
+                              }
+                              aria-label={`${column.label} row ${rowIndex + 1}`}
+                              className="h-8 w-full min-w-0 rounded-none border-0 bg-transparent px-2 font-mono text-sm shadow-none focus-visible:ring-1 dark:bg-transparent"
+                            />
+                          </td>
+                        ))}
+                        <td className="p-0">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() =>
+                              setTable((current) => current.filter((item) => item.id !== row.id))
+                            }
+                            aria-label={`Remove table row ${rowIndex + 1}`}
+                            className="rounded-none text-muted-foreground hover:text-destructive"
+                          >
+                            <X />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {table.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={tableColumns.length + 2}
+                          className="h-12 px-3 text-center text-xs text-muted-foreground"
+                        >
+                          Add a row to plot table data.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </section>
 
             <section className="p-3">
-              <div className="mb-3 flex items-center gap-2">
-                <h3 className="text-sm font-semibold">Regression</h3>
-                <Badge variant="secondary" className="font-mono text-[11px]">
-                  y₁ ~ mx₁ + b
-                </Badge>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  ["m", tableRegression.params[1]?.value],
-                  ["b", tableRegression.params[0]?.value],
-                  ["R²", tableRegression.r2],
-                ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-lg border p-2">
-                    <div className="text-[11px] text-muted-foreground">{label}</div>
-                    <div
-                      className={cn(
-                        "font-mono text-sm font-semibold",
-                        label === "R²" && "text-primary"
-                      )}
-                    >
-                      {typeof value === "number" && Number.isFinite(value)
-                        ? formatNumber(value)
-                        : "—"}
+              <h3 className="mb-3 text-sm font-semibold">Regression</h3>
+              <div className="space-y-3">
+                {tableSeries.map(({ column, regression }) => (
+                  <div key={column.id}>
+                    <Badge variant="secondary" className="mb-2 font-mono text-[11px]">
+                      {column.label} ~ m{tableColumns[0]?.label ?? "x"} + b
+                    </Badge>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        ["m", regression.params[1]?.value],
+                        ["b", regression.params[0]?.value],
+                        ["R²", regression.r2],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="rounded-lg border p-2">
+                          <div className="text-[11px] text-muted-foreground">{label}</div>
+                          <div
+                            className={cn(
+                              "font-mono text-sm font-semibold",
+                              label === "R²" && "text-primary"
+                            )}
+                          >
+                            {typeof value === "number" && Number.isFinite(value)
+                              ? formatNumber(value)
+                              : "—"}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
+                {tableSeries.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Add a y variable to fit data.</p>
+                )}
               </div>
             </section>
           </div>
@@ -761,7 +1243,7 @@ export function GraphingMode({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setRows([])}
+            onClick={() => commitRows([])}
             className="rounded-md text-muted-foreground hover:text-destructive"
           >
             Clear all
@@ -769,7 +1251,7 @@ export function GraphingMode({
         </div>
       </aside>
 
-      <section className="mirai-graphing-canvas relative min-h-0 overflow-hidden bg-background">
+      <section className="mirai-graphing-canvas relative min-h-0 overflow-hidden overscroll-contain bg-background @max-[699px]:order-1 @max-[699px]:min-h-[320px]">
         <div ref={graphHostRef} className="absolute inset-0" aria-label="Interactive graph">
           <canvas
             ref={canvasRef}
@@ -777,8 +1259,31 @@ export function GraphingMode({
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            onWheel={handleWheel}
+            onPointerCancel={handlePointerUp}
           />
+          {trace && tracePosition && (
+            <div
+              data-graph-trace-coordinate=""
+              className="pointer-events-none absolute z-20"
+              style={{ left: tracePosition.x, top: tracePosition.y }}
+            >
+              <span
+                aria-hidden="true"
+                className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background shadow-sm"
+                style={{ backgroundColor: trace.color }}
+              />
+              <output
+                aria-live="polite"
+                className={cn(
+                  "absolute w-max max-w-48 rounded-md border bg-background/95 px-2 py-1 font-mono text-xs text-foreground shadow-md backdrop-blur",
+                  tracePosition.labelOnLeft ? "right-3" : "left-3",
+                  tracePosition.labelBelow ? "top-3" : "bottom-3"
+                )}
+              >
+                ({formatNumber(trace.x)}, {formatNumber(trace.y)})
+              </output>
+            </div>
+          )}
         </div>
 
         <div className="absolute top-3 left-3 flex rounded-lg border bg-background/95 p-1 shadow-sm backdrop-blur">
@@ -796,7 +1301,7 @@ export function GraphingMode({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => setView(DEFAULT_VIEW)}
+            onClick={() => setView({ ...DEFAULT_GRAPH_VIEW })}
             aria-label="Reset graph view"
           >
             <Home />
@@ -811,47 +1316,81 @@ export function GraphingMode({
           </Button>
         </div>
 
-        <div className="absolute right-3 bottom-3 max-h-[48%] w-[min(300px,calc(100%-1.5rem))] overflow-auto rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
-              <LocateFixed className="size-3.5 text-primary" />
-              Analysis
-            </h3>
-            {trace && (
-              <Button variant="ghost" size="sm" onClick={() => setTrace(null)}>
-                Clear trace
-              </Button>
-            )}
-          </div>
-          {trace && (
-            <>
-              <div className="rounded-md bg-muted px-3 py-2 font-mono text-xs">
-                ({formatNumber(trace.x)}, {formatNumber(trace.y)})
+        {analysisOpen ? (
+          <div
+            data-graph-analysis
+            className="absolute right-3 bottom-3 max-h-[48%] w-[min(300px,calc(100%-1.5rem))] overflow-auto rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+                <LocateFixed className="size-3.5 text-primary" />
+                Analysis
+              </h3>
+              <div className="flex items-center">
+                {trace && (
+                  <Button variant="ghost" size="sm" onClick={() => setTrace(null)}>
+                    Clear trace
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setAnalysisOpen(false)}
+                  aria-label="Hide analysis"
+                >
+                  <X />
+                </Button>
               </div>
-              <Separator className="my-2" />
-            </>
-          )}
-          <div className="space-y-1">
-            {marks.slice(0, 12).map((mark, index) => (
-              <Button
-                variant="ghost"
-                key={`${mark.label}-${mark.x}-${index}`}
-                onClick={() => setTrace({ x: mark.x, y: mark.y, color: mark.color })}
-                className="h-auto w-full justify-between px-2 py-1.5 text-xs"
-              >
-                <span className="capitalize">{mark.label}</span>
-                <span className="font-mono text-muted-foreground">
-                  ({formatNumber(mark.x)}, {formatNumber(mark.y)})
-                </span>
-              </Button>
-            ))}
-            {marks.length === 0 && !trace && (
-              <p className="py-2 text-xs text-muted-foreground">
-                Click the graph to trace a curve. Zeros, extrema, and intersections appear here.
-              </p>
+            </div>
+            {trace && (
+              <>
+                <div className="rounded-md bg-muted px-3 py-2 font-mono text-xs">
+                  ({formatNumber(trace.x)}, {formatNumber(trace.y)})
+                </div>
+                <Separator className="my-2" />
+              </>
             )}
+            <div className="space-y-1">
+              {marks.slice(0, 12).map((mark, index) => (
+                <Button
+                  variant="ghost"
+                  key={`${mark.labels.join("-")}-${mark.x}-${index}`}
+                  onClick={() =>
+                    setTrace({
+                      x: mark.x,
+                      y: mark.y,
+                      color: mark.colors.at(-1) ?? CALCULATOR_CHART_COLORS[4],
+                    })
+                  }
+                  className="h-auto w-full justify-between gap-2 px-2 py-1.5 text-xs"
+                >
+                  <span className="truncate capitalize">
+                    {mark.labels.join(" · ")}
+                    {mark.count > 1 ? ` ×${String(mark.count)}` : ""}
+                  </span>
+                  <span className="shrink-0 font-mono text-muted-foreground">
+                    ({formatNumber(mark.x)}, {formatNumber(mark.y)})
+                  </span>
+                </Button>
+              ))}
+              {marks.length === 0 && !trace && (
+                <p className="py-2 text-xs text-muted-foreground">
+                  Touch a curve to trace and drag it. Zeros, extrema, and intersections appear here.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAnalysisOpen(true)}
+            className="absolute right-3 bottom-3 bg-background/95 shadow-sm backdrop-blur"
+          >
+            <LocateFixed />
+            Analysis
+          </Button>
+        )}
       </section>
     </div>
   )

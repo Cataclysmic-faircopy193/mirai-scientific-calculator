@@ -1,5 +1,6 @@
 import type { SimpleIcon } from "simple-icons"
 
+/** Renders a Simple Icons path inside a consistently sized accessible mark. */
 export function SimpleIconMark({
   icon,
   className,

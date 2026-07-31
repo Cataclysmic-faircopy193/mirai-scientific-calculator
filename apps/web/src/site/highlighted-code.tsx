@@ -3,6 +3,7 @@ import { Highlight } from "prism-react-renderer"
 import { cn } from "@/lib/utils"
 import { CODE_THEME, PRISM_LANGUAGES, type CodeLanguage } from "@/site/constants/code"
 
+/** Tokenizes TypeScript source into an accessible syntax-highlighted code block. */
 export function HighlightedCode({
   ariaLabel,
   className,

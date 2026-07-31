@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { EXTENSIONS } from "@/site/site-data"
 
+/** Lists available calculator extensions and links to focused demonstrations. */
 export function ExtensionsPage() {
   return (
     <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 lg:px-10 lg:py-20">

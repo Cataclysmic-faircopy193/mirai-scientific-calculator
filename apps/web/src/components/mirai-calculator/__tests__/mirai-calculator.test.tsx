@@ -5,16 +5,18 @@ import { describe, expect, it, vi } from "vitest"
 import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 
 describe("MiraiCalculator", () => {
-  it("keeps package branding out of the calculator chrome", () => {
+  it("keeps the OpenMirai logo in the calculator chrome", () => {
     render(<MiraiCalculator extensions={[]} />)
 
-    expect(screen.queryByRole("img", { name: "OpenMirai" })).not.toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "OpenMirai" })).toBeInTheDocument()
   })
 
-  it("renders the OpenMirai mark only in the practice backdrop", () => {
-    const { container } = render(<MiraiCalculator showBackdrop />)
+  it("does not bundle the playground practice scene into the registry component", () => {
+    const { container } = render(<MiraiCalculator />)
 
-    expect(container.querySelector('svg[aria-label="OpenMirai"]')).toBeInTheDocument()
+    expect(container.querySelectorAll('svg[aria-label="OpenMirai"]')).toHaveLength(1)
+    expect(screen.queryByText("Practice session")).not.toBeInTheDocument()
+    expect(container.querySelector("[data-playground-backdrop]")).not.toBeInTheDocument()
   })
 
   it("evaluates an expression from the scientific keypad", async () => {
@@ -53,6 +55,16 @@ describe("MiraiCalculator", () => {
     expect(calculator).toHaveAttribute("data-theme", "dark")
     await user.click(screen.getByRole("button", { name: "Use light mode" }))
     expect(calculator).toHaveAttribute("data-theme", "light")
+  })
+
+  it("lets a controlled system theme switch to an explicit theme", async () => {
+    const user = userEvent.setup()
+    const onThemeChange = vi.fn()
+    render(<MiraiCalculator theme="system" onThemeChange={onThemeChange} />)
+
+    await user.click(screen.getByRole("button", { name: "Use dark mode" }))
+
+    expect(onThemeChange).toHaveBeenCalledWith("dark")
   })
 
   it("keeps the angle mode control inside calculator settings", async () => {
@@ -98,9 +110,10 @@ describe("MiraiCalculator", () => {
     render(<MiraiCalculator />)
 
     await user.click(screen.getByRole("button", { name: "Graphing" }))
-    expect(screen.getByRole("textbox", { name: "Graph expression 1" })).toHaveValue(
-      "y = a x² − 5x + 6"
-    )
+    expect(screen.getByText("No expressions yet")).toBeInTheDocument()
+    expect(screen.getByRole("table")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Expression" }))
+    expect(screen.getByRole("textbox", { name: "Graph expression 1" })).toHaveValue("")
 
     await user.click(screen.getByRole("button", { name: "Stats" }))
     expect(screen.getByLabelText("X values")).toBeInTheDocument()
@@ -130,12 +143,21 @@ describe("MiraiCalculator", () => {
 
   it("updates tool results as values change", async () => {
     const user = userEvent.setup()
-    render(<MiraiCalculator defaultMode="tools" />)
+    render(
+      <MiraiCalculator defaultMode="tools" defaultToolsData={{ percent: 15, percentOf: 240 }} />
+    )
 
     const percent = screen.getByLabelText("Percent")
     await user.clear(percent)
     await user.type(percent, "20")
 
     expect(screen.getByText("48")).toBeInTheDocument()
+  })
+
+  it("keeps tools headless until the host supplies initial values", () => {
+    render(<MiraiCalculator defaultMode="tools" />)
+
+    expect(screen.getByLabelText("Percent")).toHaveValue("")
+    expect(screen.getByLabelText("Radius r")).toHaveValue("")
   })
 })

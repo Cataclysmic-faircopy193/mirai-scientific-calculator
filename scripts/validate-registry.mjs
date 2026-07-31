@@ -9,7 +9,6 @@ if (!calculator || calculator.type !== "registry:block") {
 }
 
 const expectedNpmDependencies = new Set([
-  "@fontsource-variable/inter@^5.3.0",
   "@openmirai/calculator-core@^0.2.0",
   "lucide-react@^1.28.0",
 ])
@@ -50,13 +49,18 @@ if (actualDependencies.size !== expectedDependencies.size) {
 const targets = new Set()
 
 for (const file of calculator.files) {
-  await access(path.resolve("apps/web", file.path))
+  const sourcePath = path.resolve("apps/web", file.path)
+  await access(sourcePath)
 
   if (
     file.path.includes("packages/calculator-core/") ||
     file.target?.startsWith("@lib/mirai-calculator/")
   ) {
     throw new Error(`Registry must consume calculator core instead of copying it: ${file.path}`)
+  }
+
+  if (file.path.endsWith(".css") || file.target?.endsWith(".css")) {
+    throw new Error(`Registry styling must be expressed with Tailwind utilities: ${file.path}`)
   }
 
   if (!file.target?.startsWith("@components/mirai-calculator/")) {
@@ -67,41 +71,15 @@ for (const file of calculator.files) {
     throw new Error(`Duplicate registry target: ${file.target}`)
   }
 
+  const source = await readFile(sourcePath, "utf8")
+  if (/mirai-calculator\.css|calculator-constants/.test(source)) {
+    throw new Error(`Registry imports a removed local styling or constants module: ${file.path}`)
+  }
+  if (/Practice session|Question 14 of 22|PLAYGROUND_PRACTICE_ANSWERS/.test(source)) {
+    throw new Error(`Registry contains app-owned playground scenery: ${file.path}`)
+  }
+
   targets.add(file.target)
-}
-
-const css = await readFile(
-  "packages/calculator-registry/src/components/mirai-calculator/mirai-calculator.css",
-  "utf8"
-)
-
-for (const forbidden of [":root", "@layer base", "body {", "html {"]) {
-  if (css.includes(forbidden)) {
-    throw new Error(`Calculator registry CSS contains global selector: ${forbidden}`)
-  }
-}
-
-if (/(^|})\s*\.dark\s*{/m.test(css)) {
-  throw new Error("Calculator registry CSS must not override the consumer dark theme")
-}
-
-const baselineHexColors = new Set([
-  "#1a6f68",
-  "#27272a",
-  "#2a9d90",
-  "#71717a",
-  "#e4e4e7",
-  "#ef4444",
-  "#f0faf9",
-  "#f4f4f5",
-  "#ffffff",
-])
-const cssHexColors = new Set(css.match(/#[\da-f]{3,8}\b/gi)?.map((color) => color.toLowerCase()))
-
-for (const color of cssHexColors) {
-  if (!baselineHexColors.has(color)) {
-    throw new Error(`Calculator registry CSS contains a non-baseline color: ${color}`)
-  }
 }
 
 console.log(`Validated ${calculator.files.length} calculator registry files.`)

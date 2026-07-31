@@ -1,15 +1,25 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  calculateNumberExtent,
   calculateStatistics,
   correlation,
   covariance,
   fitRegression,
   parseNumberList,
   quantile,
+  serializeNumberList,
 } from "../statistics"
 
 describe("statistics utilities", () => {
+  it("prepares numeric input and padded plot extents", () => {
+    expect(serializeNumberList([2, "4", 8])).toBe("2, 4, 8")
+    expect(serializeNumberList(undefined)).toBe("")
+    expect(calculateNumberExtent([])).toEqual([0, 1])
+    expect(calculateNumberExtent([3])).toEqual([2, 4])
+    expect(calculateNumberExtent([0, 10])).toEqual([-1, 11])
+  })
+
   it("parses flexible list input", () => {
     expect(parseNumberList("1, 2\n3; invalid 4")).toEqual([1, 2, 3, 4])
   })

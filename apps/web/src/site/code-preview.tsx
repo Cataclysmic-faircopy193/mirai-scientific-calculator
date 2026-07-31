@@ -9,6 +9,7 @@ import { HighlightedCode } from "@/site/highlighted-code"
 const PREVIEW_TAB = "preview"
 const CODE_TAB = "code"
 
+/** Displays an interactive preview beside its syntax-highlighted implementation. */
 export function CodePreview({
   preview,
   code,
@@ -19,8 +20,8 @@ export function CodePreview({
   previewLabel: string
 }) {
   return (
-    <Tabs defaultValue={PREVIEW_TAB} className="gap-0">
-      <Card className="gap-0 overflow-hidden py-0">
+    <Tabs defaultValue={PREVIEW_TAB} className="min-w-0 gap-0">
+      <Card className="min-w-0 gap-0 overflow-hidden py-0">
         <CardHeader className="flex min-h-12 flex-row items-center justify-between border-b bg-muted/30 px-3 py-2">
           <TabsList>
             <TabsTrigger value={PREVIEW_TAB}>
@@ -32,9 +33,9 @@ export function CodePreview({
           </TabsList>
           <CopyButton value={code} label="Copy code" />
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="min-w-0 p-0">
           <TabsContent value={PREVIEW_TAB} aria-label={`${previewLabel} preview`}>
-            <div className="bg-muted/20 p-3 sm:p-6">{preview}</div>
+            <div className="min-w-0 overflow-hidden bg-muted/20 p-3 sm:p-6">{preview}</div>
           </TabsContent>
           <TabsContent value={CODE_TAB} aria-label={`${previewLabel} code`}>
             <HighlightedCode

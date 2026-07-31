@@ -177,6 +177,15 @@ const KEY_SETS = {
   variables: VARIABLE_KEYS,
 }
 
+/** Returns a label-length bucket used to fit keypad text within compact buttons. */
+function getKeyLabelSize(label: string) {
+  const length = [...label].length
+  if (length === 1) return "single"
+  if (length <= 3) return "short"
+  if (length <= 5) return "medium"
+  return "long"
+}
+
 const EXAMPLES = [
   { expression: "(2÷3)+(1÷6)", label: "Add fractions" },
   { expression: "sin(30)", label: "sin(30°)" },
@@ -186,6 +195,7 @@ const EXAMPLES = [
   { expression: "f(4)", label: "Use f(x)" },
 ]
 
+/** Renders the scientific expression workspace and calculator keypad. */
 export function ScientificMode({
   engine,
   definitions,
@@ -331,8 +341,8 @@ export function ScientificMode({
   }
 
   return (
-    <div className="mirai-scientific-layout grid min-h-0 flex-1 overflow-hidden">
-      <section className="mirai-scientific-primary flex min-h-0 min-w-0 flex-col">
+    <div className="mirai-scientific-layout grid min-h-0 flex-1 grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)] overflow-hidden @max-[699px]:grid-cols-1 @max-[699px]:overflow-y-auto">
+      <section className="mirai-scientific-primary flex min-h-0 min-w-0 flex-col overflow-hidden border-r @max-[699px]:min-h-[450px] @max-[699px]:border-r-0 @max-[699px]:border-b">
         <div className="flex min-h-[132px] shrink-0 flex-col justify-center gap-2 px-6 py-4">
           <label className="sr-only" htmlFor="mirai-expression">
             Calculator expression
@@ -411,21 +421,36 @@ export function ScientificMode({
         >
           <TabsList
             variant="line"
-            className="mirai-keypad-tabs-list h-10 w-full justify-start gap-1 rounded-none border-y bg-muted/45 px-4 py-0"
+            className="mirai-keypad-tabs-list h-10! w-full flex-none justify-start gap-1 overflow-hidden rounded-none border-y bg-muted/45 px-4 py-0"
           >
-            <TabsTrigger className="mirai-keypad-tab" value="basic">
+            <TabsTrigger
+              className="mirai-keypad-tab h-10 flex-none rounded-none bg-transparent! px-3 text-sm font-semibold text-muted-foreground shadow-none! hover:bg-transparent! data-active:bg-transparent! data-active:text-primary after:right-0 after:bottom-[-1px]! after:left-0 after:h-0.5! after:bg-primary!"
+              value="basic"
+            >
               Basic
             </TabsTrigger>
-            <TabsTrigger className="mirai-keypad-tab" value="functions">
+            <TabsTrigger
+              className="mirai-keypad-tab h-10 flex-none rounded-none bg-transparent! px-3 text-sm font-semibold text-muted-foreground shadow-none! hover:bg-transparent! data-active:bg-transparent! data-active:text-primary after:right-0 after:bottom-[-1px]! after:left-0 after:h-0.5! after:bg-primary!"
+              value="functions"
+            >
               Functions
             </TabsTrigger>
-            <TabsTrigger className="mirai-keypad-tab" value="trig">
+            <TabsTrigger
+              className="mirai-keypad-tab h-10 flex-none rounded-none bg-transparent! px-3 text-sm font-semibold text-muted-foreground shadow-none! hover:bg-transparent! data-active:bg-transparent! data-active:text-primary after:right-0 after:bottom-[-1px]! after:left-0 after:h-0.5! after:bg-primary!"
+              value="trig"
+            >
               Trig
             </TabsTrigger>
-            <TabsTrigger className="mirai-keypad-tab" value="stats">
+            <TabsTrigger
+              className="mirai-keypad-tab h-10 flex-none rounded-none bg-transparent! px-3 text-sm font-semibold text-muted-foreground shadow-none! hover:bg-transparent! data-active:bg-transparent! data-active:text-primary after:right-0 after:bottom-[-1px]! after:left-0 after:h-0.5! after:bg-primary!"
+              value="stats"
+            >
               Stats
             </TabsTrigger>
-            <TabsTrigger className="mirai-keypad-tab" value="variables">
+            <TabsTrigger
+              className="mirai-keypad-tab h-10 flex-none rounded-none bg-transparent! px-3 text-sm font-semibold text-muted-foreground shadow-none! hover:bg-transparent! data-active:bg-transparent! data-active:text-primary after:right-0 after:bottom-[-1px]! after:left-0 after:h-0.5! after:bg-primary!"
+              value="variables"
+            >
               Variables
             </TabsTrigger>
           </TabsList>
@@ -438,8 +463,9 @@ export function ScientificMode({
                   variant={key.tone === "primary" ? "default" : "outline"}
                   onClick={() => pressKey(key)}
                   aria-label={key.ariaLabel ?? key.label}
+                  data-key-label-size={key.icon ? "single" : getKeyLabelSize(key.label)}
                   className={cn(
-                    "h-auto min-h-11 min-w-0 rounded-[6px] font-sans text-base font-medium sm:text-[17px]",
+                    "mirai-scientific-key h-auto min-h-11 min-w-0 overflow-hidden rounded-[6px] px-[clamp(0.125rem,1cqi,0.75rem)] font-sans text-[clamp(0.5rem,2.4cqi,1.0625rem)] leading-[1.15] font-medium whitespace-nowrap data-[key-label-size=single]:text-[clamp(0.875rem,5cqi,1.0625rem)] data-[key-label-size=short]:text-[clamp(0.7rem,4cqi,1.0625rem)] data-[key-label-size=medium]:text-[clamp(0.6rem,3.2cqi,1.0625rem)] data-[key-label-size=long]:px-px data-[key-label-size=long]:text-[clamp(0.46875rem,2.2cqi,1.0625rem)]",
                     key.tone === "operator" &&
                       "border-primary/25 bg-primary/5 text-primary hover:bg-primary/10",
                     key.span === 2 && "col-span-2"
@@ -453,7 +479,7 @@ export function ScientificMode({
         </Tabs>
       </section>
 
-      <aside className="mirai-scientific-secondary flex min-h-0 flex-col bg-muted/25">
+      <aside className="mirai-scientific-secondary flex min-h-0 flex-col bg-muted/25 @max-[699px]:min-h-[300px]">
         <ScrollArea className="min-h-0 flex-1">
           <section className="border-b p-4">
             <div className="mb-3 flex items-center justify-between">

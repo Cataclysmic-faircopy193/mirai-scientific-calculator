@@ -289,6 +289,7 @@ function validateFiniteRecord(values: Record<string, number>, label: string): vo
   }
 }
 
+/** Computes the non-negative greatest common divisor of two safe integers. */
 export function greatestCommonDivisor(a: number, b: number): number {
   if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) {
     throw new Error("gcd needs safe whole numbers")
@@ -303,6 +304,7 @@ export function greatestCommonDivisor(a: number, b: number): number {
   return left
 }
 
+/** Computes a finite factorial for a non-negative whole number. */
 export function factorial(value: number): number {
   if (value < 0 || !Number.isInteger(value)) {
     throw new Error("Factorial needs a non-negative whole number")
@@ -345,6 +347,7 @@ function combinations(n: number, r: number): number {
   return cleanNumber(result)
 }
 
+/** Evaluates calculator expressions against configurable definitions, variables, and angle mode. */
 export class CalculatorEngine {
   private angleMode: AngleMode = "degrees"
   private ans = 0
@@ -1314,6 +1317,7 @@ export class CalculatorEngine {
   }
 }
 
+/** Evaluates one expression with a short-lived calculator engine. */
 export function evaluateExpression(
   expression: string,
   options?: CalculatorEngineOptions

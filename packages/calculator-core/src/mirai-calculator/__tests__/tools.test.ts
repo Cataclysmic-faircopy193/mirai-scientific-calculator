@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest"
 
-import { calculateCoordinates, calculatePercent, calculateRatio, calculateShapes } from "../tools"
+import {
+  calculateCoordinates,
+  calculatePercent,
+  calculateRatio,
+  calculateShapes,
+  parseToolNumber,
+  serializeToolValue,
+} from "../tools"
 
 describe("calculator tools", () => {
+  it("parses formatted tool values with a caller-selected fallback", () => {
+    expect(parseToolNumber("1,234.5")).toBe(1234.5)
+    expect(parseToolNumber("not a number", 2)).toBe(2)
+  })
+
+  it("keeps registry tool inputs empty unless the host supplies a value", () => {
+    expect(serializeToolValue(undefined)).toBe("")
+    expect(serializeToolValue(0)).toBe("0")
+    expect(serializeToolValue("3.5")).toBe("3.5")
+  })
+
   it("calculates percentages", () => {
     expect(calculatePercent(15, 240)).toEqual({
       portion: 36,

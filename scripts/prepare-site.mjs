@@ -7,6 +7,7 @@ const registryDirectory = path.join(siteDirectory, "r")
 
 const requiredFiles = [
   path.join(siteDirectory, "index.html"),
+  path.join(siteDirectory, "llms.txt"),
   path.join(rootDirectory, "registry-dist", "calculator.json"),
   path.join(rootDirectory, "registry.json"),
 ]
@@ -32,41 +33,6 @@ await Promise.all([
   ),
 ])
 
-const llmsText = `# OpenMirai Calculator
-
-> An editable scientific, graphing, statistics, and math tools calculator for React, with a framework-independent core package.
-
-## Install
-
-\`\`\`bash
-pnpm dlx shadcn@latest add @openmirai/calculator
-\`\`\`
-
-## Documentation
-
-- [Overview](/)
-- [Playground](/playground)
-- [Extensions](/extensions)
-- [Installation](/docs/installation)
-- [Core API](/docs/core)
-
-## Extensions
-
-- [Scientific](/extensions/scientific)
-- [Graphing](/extensions/graphing)
-- [Statistics](/extensions/statistics)
-- [Tools](/extensions/tools)
-
-## Registry
-
-- [Calculator item](/r/calculator.json)
-- [Registry index](/r/registry.json)
-
-## Source
-
-- [GitHub repository](https://github.com/openmirai/mirai-scientific-calculator)
-`
-
 const headersText = `/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
@@ -85,9 +51,6 @@ const headersText = `/*
   Cache-Control: public, max-age=300, s-maxage=900
 `
 
-await Promise.all([
-  writeFile(path.join(siteDirectory, "llms.txt"), llmsText),
-  writeFile(path.join(siteDirectory, "_headers"), headersText),
-])
+await Promise.all([writeFile(path.join(siteDirectory, "_headers"), headersText)])
 
 console.log(`Prepared static site assets in ${path.relative(rootDirectory, siteDirectory)}`)

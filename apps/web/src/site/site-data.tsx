@@ -133,6 +133,7 @@ export function MathToolsCalculator() {
 
 export const ALL_EXTENSION_VALUES = EXTENSIONS.map((extension) => extension.id)
 
+/** Resolves one extension descriptor by its URL-safe identifier. */
 export function getExtension(value: string) {
   return EXTENSIONS.find((extension) => extension.id === value)
 }

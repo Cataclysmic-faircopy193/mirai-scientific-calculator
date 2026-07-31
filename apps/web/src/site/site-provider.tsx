@@ -8,6 +8,7 @@ function readInitialTheme(): SiteTheme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light"
 }
 
+/** Provides shared showcase state for theme and command-palette behavior. */
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<SiteTheme>(readInitialTheme)
 

@@ -316,7 +316,11 @@ export function cn(...inputs: ClassValue[]) {
     `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 
 export default function App() {
-  return <MiraiCalculator height={660} />
+  return (
+    <main className="h-[660px]">
+      <MiraiCalculator />
+    </main>
+  )
 }
 `
   )
