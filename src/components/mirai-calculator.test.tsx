@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { MiraiCalculator } from "@/components/mirai-calculator"
 
@@ -69,6 +69,34 @@ describe("MiraiCalculator", () => {
     await user.keyboard("{Enter}{ArrowDown}{Enter}")
 
     expect(angleMode).toHaveTextContent("Radians")
+  })
+
+  it("hides and restores the calculator without losing its state", async () => {
+    const user = userEvent.setup()
+    const onHiddenChange = vi.fn()
+    render(<MiraiCalculator onHiddenChange={onHiddenChange} />)
+
+    await user.click(screen.getByRole("button", { name: "7" }))
+    expect(screen.getByLabelText("Calculator expression")).toHaveValue("7")
+
+    await user.click(
+      screen.getByRole("button", { name: "Hide calculator" }),
+    )
+
+    expect(onHiddenChange).toHaveBeenLastCalledWith(true)
+    expect(
+      screen.queryByRole("button", { name: "Scientific" }),
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole("button", { name: "Show calculator" }),
+    )
+
+    expect(onHiddenChange).toHaveBeenLastCalledWith(false)
+    expect(
+      screen.getByRole("button", { name: "Scientific" }),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText("Calculator expression")).toHaveValue("7")
   })
 
   it("switches among graphing, statistics, and tools modes", async () => {

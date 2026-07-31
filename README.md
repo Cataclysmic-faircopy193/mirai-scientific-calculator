@@ -17,7 +17,7 @@ interface while exposing a reusable, typed package for any React application.
 - Self-hosted Inter variable typography
 - Light, dark, and system theme support
 - Draggable, resizable, and fullscreen practice-player panel
-- 179 automated tests covering math rules, hostile edge cases, seeded
+- 180 automated tests covering math rules, hostile edge cases, seeded
   properties, package exports, and UI interactions
 
 ## Interface
@@ -135,7 +135,7 @@ minimum while remaining bounded by the backdrop.
 
 ## Controlled state
 
-Mode, angle mode, and theme can each be controlled or uncontrolled.
+Mode, angle mode, theme, and visibility can each be controlled or uncontrolled.
 
 ```tsx
 import { useState } from "react"
@@ -149,6 +149,7 @@ import "mirai-scientific-calculator/styles.css"
 export function ControlledCalculator() {
   const [mode, setMode] = useState<CalculatorMode>("graphing")
   const [theme, setTheme] = useState<CalculatorTheme>("dark")
+  const [hidden, setHidden] = useState(false)
 
   return (
     <MiraiCalculator
@@ -157,6 +158,8 @@ export function ControlledCalculator() {
       theme={theme}
       onThemeChange={setTheme}
       angleMode="degrees"
+      hidden={hidden}
+      onHiddenChange={setHidden}
     />
   )
 }
@@ -178,6 +181,9 @@ export function ControlledCalculator() {
 | `theme` | `"light" \| "dark" \| "system"` | — | Controlled color theme |
 | `defaultTheme` | `"light" \| "dark" \| "system"` | `"light"` | Initial uncontrolled theme |
 | `onThemeChange` | `(theme) => void` | — | Called after the theme changes |
+| `hidden` | `boolean` | — | Controlled hidden state |
+| `defaultHidden` | `boolean` | `false` | Initial uncontrolled hidden state |
+| `onHiddenChange` | `(hidden) => void` | — | Called when the calculator is hidden or restored |
 | `startFullscreen` | `boolean` | `false` | Opens the panel in fullscreen mode |
 | `showBackdrop` | `boolean` | `false` | Enables the practice backdrop and panel drag/resize |
 | `title` | `string` | `"Calculator"` | Accessible panel title |

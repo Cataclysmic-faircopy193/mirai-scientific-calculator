@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react"
 import {
+  Calculator as CalculatorIcon,
+  EyeOff,
   Expand,
   Minimize2,
   Moon,
@@ -63,6 +65,9 @@ export interface MiraiCalculatorProps {
   theme?: CalculatorTheme
   defaultTheme?: CalculatorTheme
   onThemeChange?: (theme: CalculatorTheme) => void
+  hidden?: boolean
+  defaultHidden?: boolean
+  onHiddenChange?: (hidden: boolean) => void
   startFullscreen?: boolean
   showBackdrop?: boolean
   title?: string
@@ -185,6 +190,9 @@ export function MiraiCalculator({
   theme,
   defaultTheme = "light",
   onThemeChange,
+  hidden,
+  defaultHidden = false,
+  onHiddenChange,
   startFullscreen = false,
   showBackdrop = false,
   title = "Calculator",
@@ -193,6 +201,7 @@ export function MiraiCalculator({
   const [internalMode, setInternalMode] = useState(defaultMode)
   const [internalAngleMode, setInternalAngleMode] = useState(defaultAngleMode)
   const [internalTheme, setInternalTheme] = useState(defaultTheme)
+  const [internalHidden, setInternalHidden] = useState(defaultHidden)
   const [systemDark, setSystemDark] = useState(() =>
     typeof window === "undefined"
       ? false
@@ -233,6 +242,7 @@ export function MiraiCalculator({
   const activeMode = mode ?? internalMode
   const activeAngleMode = angleMode ?? internalAngleMode
   const activeTheme = theme ?? internalTheme
+  const activeHidden = hidden ?? internalHidden
   const resolvedTheme =
     activeTheme === "system" ? (systemDark ? "dark" : "light") : activeTheme
   useEffect(() => {
@@ -301,6 +311,15 @@ export function MiraiCalculator({
   const setTheme = (nextTheme: CalculatorTheme) => {
     if (theme === undefined) setInternalTheme(nextTheme)
     onThemeChange?.(nextTheme)
+  }
+
+  const setHidden = (nextHidden: boolean) => {
+    if (hidden === undefined) setInternalHidden(nextHidden)
+    onHiddenChange?.(nextHidden)
+    if (nextHidden) {
+      setFullscreen(false)
+      setSettingsOpen(false)
+    }
   }
 
   const formatOptions = useMemo<NumberFormatOptions>(
@@ -458,7 +477,38 @@ export function MiraiCalculator({
         )}
       >
         {showBackdrop && <PracticeBackdrop />}
+        {activeHidden && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="default"
+                size="icon"
+                aria-label="Show calculator"
+                onClick={() => setHidden(false)}
+                className={cn(
+                  "mirai-calculator size-12 rounded-xl shadow-xl",
+                  resolvedTheme === "dark" && "dark",
+                  showBackdrop && "absolute z-10",
+                )}
+                style={
+                  showBackdrop
+                    ? {
+                        left: panelGeometry.x,
+                        top: panelGeometry.y,
+                      }
+                    : undefined
+                }
+                data-theme={resolvedTheme}
+              >
+                <CalculatorIcon className="size-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Show calculator</TooltipContent>
+          </Tooltip>
+        )}
         <div
+          hidden={activeHidden}
           className={cn(
             "mirai-calculator flex min-h-0 w-full flex-col overflow-hidden rounded-[12px] border bg-background text-foreground shadow-xl",
             resolvedTheme === "dark" && "dark",
@@ -537,6 +587,12 @@ export function MiraiCalculator({
                 onClick={() => setSettingsOpen((open) => !open)}
               >
                 <Settings2 />
+              </HeaderIconButton>
+              <HeaderIconButton
+                label="Hide calculator"
+                onClick={() => setHidden(true)}
+              >
+                <EyeOff />
               </HeaderIconButton>
               <Button
                 variant="outline"
