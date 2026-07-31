@@ -17,7 +17,7 @@ interface while exposing a reusable, typed package for any React application.
 - Self-hosted Inter variable typography
 - Light, dark, and system theme support
 - Draggable, resizable, and fullscreen practice-player panel
-- 178 automated tests covering math rules, hostile edge cases, seeded
+- 179 automated tests covering math rules, hostile edge cases, seeded
   properties, package exports, and UI interactions
 
 ## Interface

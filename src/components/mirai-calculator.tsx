@@ -524,20 +524,6 @@ export function MiraiCalculator({
             </nav>
 
             <div className="ml-auto flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setAngleMode(
-                    activeAngleMode === "degrees" ? "radians" : "degrees",
-                  )
-                }
-                className="h-[30px] rounded-md px-2.5 text-xs font-semibold uppercase text-primary"
-              >
-                <span className="size-1.5 rounded-full bg-primary" />
-                {activeAngleMode === "degrees" ? "Degrees" : "Radians"}
-              </Button>
-
               <HeaderIconButton
                 label={`Use ${resolvedTheme === "dark" ? "light" : "dark"} mode`}
                 onClick={() =>
@@ -579,6 +565,26 @@ export function MiraiCalculator({
               aria-label="Calculator settings"
               className="flex shrink-0 flex-wrap items-end gap-4 border-b bg-muted/35 px-4 py-3"
             >
+              <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Angle mode
+                <Select
+                  value={activeAngleMode}
+                  onValueChange={(value: AngleMode) => setAngleMode(value)}
+                >
+                  <SelectTrigger
+                    size="sm"
+                    className="w-28 bg-background"
+                    aria-label="Angle mode"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="degrees">Degrees</SelectItem>
+                    <SelectItem value="radians">Radians</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+
               <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Notation
                 <Select

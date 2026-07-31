@@ -1,6 +1,6 @@
 {
   "name": "mirai-scientific-calculator",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A reusable scientific, graphing, statistics, and math tools calculator for React.",
   "repository": {
     "type": "git",

@@ -47,6 +47,30 @@ describe("MiraiCalculator", () => {
     expect(calculator).toHaveAttribute("data-theme", "light")
   })
 
+  it("keeps the angle mode control inside calculator settings", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator />)
+
+    expect(
+      screen.queryByRole("button", { name: "Degrees" }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("combobox", { name: "Angle mode" }),
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole("button", { name: "Calculator settings" }),
+    )
+
+    const angleMode = screen.getByRole("combobox", { name: "Angle mode" })
+    expect(angleMode).toHaveTextContent("Degrees")
+
+    angleMode.focus()
+    await user.keyboard("{Enter}{ArrowDown}{Enter}")
+
+    expect(angleMode).toHaveTextContent("Radians")
+  })
+
   it("switches among graphing, statistics, and tools modes", async () => {
     const user = userEvent.setup()
     render(<MiraiCalculator />)
