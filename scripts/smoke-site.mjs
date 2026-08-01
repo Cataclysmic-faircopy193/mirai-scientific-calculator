@@ -83,7 +83,3 @@ await Promise.all(
     }
   })
 )
-
-console.log(
-  `Static site smoke passed (${assetPaths.length} asset references, registry and SPA config verified)`
-)

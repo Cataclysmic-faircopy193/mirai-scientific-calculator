@@ -1,25 +1,15 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentProps,
-  type PointerEvent as ReactPointerEvent,
-} from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
-import {
-  MiraiCalculator,
-  OpenMiraiLogo,
-  type CalculatorTheme,
-} from "@/components/mirai-calculator/mirai-calculator"
+import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { OpenMiraiLogo } from "@/site/openmirai-logo"
 import {
   PLAYGROUND_CALCULATOR_GEOMETRY,
   PLAYGROUND_PRACTICE_ANSWERS,
 } from "@/site/constants/playground"
 import { useSystemTheme } from "@/site/use-system-theme"
+import type { CalculatorTheme } from "@openmirai/calculator-core/configuration"
 
-type PlaygroundCalculatorPreviewProps = ComponentProps<typeof MiraiCalculator> & {
+type PlaygroundCalculatorPreviewProps = React.ComponentProps<typeof MiraiCalculator> & {
   showBackdrop: boolean
 }
 
@@ -61,7 +51,9 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 /** Keeps a requested calculator frame inside its preview without exceeding responsive bounds. */
 function constrainFrameGeometry(geometry: FrameGeometry, bounds: PreviewBounds): FrameGeometry {
-  if (bounds.width <= 0 || bounds.height <= 0) return geometry
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return geometry
+  }
 
   const gap = Math.min(
     PLAYGROUND_CALCULATOR_GEOMETRY.boundaryGap,
@@ -83,6 +75,32 @@ function constrainFrameGeometry(geometry: FrameGeometry, bounds: PreviewBounds):
   }
 }
 
+/** Keeps the compact hidden launcher inside the preview while preserving the expanded frame size. */
+function constrainHiddenFrameGeometry(
+  geometry: FrameGeometry,
+  bounds: PreviewBounds
+): FrameGeometry {
+  const hiddenSize = PLAYGROUND_CALCULATOR_GEOMETRY.hiddenSize
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return { ...geometry, width: hiddenSize, height: hiddenSize }
+  }
+
+  const gap = Math.min(
+    PLAYGROUND_CALCULATOR_GEOMETRY.boundaryGap,
+    bounds.width / 2,
+    bounds.height / 2
+  )
+  const width = Math.min(hiddenSize, Math.max(1, bounds.width - gap * 2))
+  const height = Math.min(hiddenSize, Math.max(1, bounds.height - gap * 2))
+
+  return {
+    x: clamp(geometry.x, gap, Math.max(gap, bounds.width - gap - width)),
+    y: clamp(geometry.y, gap, Math.max(gap, bounds.height - gap - height)),
+    width,
+    height,
+  }
+}
+
 /** Applies pointer-driven geometry immediately so dragging stays synchronized with the pointer. */
 function applyFrameGeometry(frame: HTMLDivElement, geometry: FrameGeometry): void {
   frame.style.left = `${geometry.x}px`
@@ -94,7 +112,13 @@ function applyFrameGeometry(frame: HTMLDivElement, geometry: FrameGeometry): voi
 /** Resolves a calculator theme for app-owned preview scenery. */
 function useResolvedCalculatorTheme(theme: CalculatorTheme): "light" | "dark" {
   const systemDark = useSystemTheme()
-  return theme === "system" ? (systemDark ? "dark" : "light") : theme
+  switch (theme) {
+    case "system":
+      return systemDark ? "dark" : "light"
+    case "light":
+    case "dark":
+      return theme
+  }
 }
 
 /** Renders the website-only practice scene behind the installable calculator component. */
@@ -155,6 +179,9 @@ export function PlaygroundCalculatorPreview({
   showBackdrop,
   theme,
   defaultTheme,
+  hidden,
+  defaultHidden = false,
+  onHiddenChange,
   ...calculatorProps
 }: PlaygroundCalculatorPreviewProps) {
   const resolvedTheme = useResolvedCalculatorTheme(theme ?? defaultTheme ?? "light")
@@ -165,14 +192,29 @@ export function PlaygroundCalculatorPreview({
   const suppressLauncherClickRef = useRef(false)
   const [previewBounds, setPreviewBounds] = useState(EMPTY_PREVIEW_BOUNDS)
   const [frameGeometry, setFrameGeometry] = useState(INITIAL_FRAME_GEOMETRY)
+  const [internalHidden, setInternalHidden] = useState(defaultHidden)
+  const activeHidden = hidden ?? internalHidden
   const constrainedGeometry = useMemo(
-    () => constrainFrameGeometry(frameGeometry, previewBounds),
-    [frameGeometry, previewBounds]
+    () =>
+      activeHidden
+        ? constrainHiddenFrameGeometry(frameGeometry, previewBounds)
+        : constrainFrameGeometry(frameGeometry, previewBounds),
+    [activeHidden, frameGeometry, previewBounds]
   )
+
+  /** Synchronizes the installable calculator's hidden state with its app-owned frame. */
+  const setHidden = (nextHidden: boolean) => {
+    if (hidden === undefined) {
+      setInternalHidden(nextHidden)
+    }
+    onHiddenChange?.(nextHidden)
+  }
 
   useLayoutEffect(() => {
     const preview = previewRef.current
-    if (!preview) return
+    if (!preview) {
+      return
+    }
 
     const measure = () => {
       const bounds = preview.getBoundingClientRect()
@@ -201,14 +243,18 @@ export function PlaygroundCalculatorPreview({
   )
 
   /** Starts an immediate app-layer drag or resize interaction. */
-  const startFrameInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
+  const startFrameInteraction = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return
+    }
 
     const target = event.target as HTMLElement
     const resizeHandle = target.closest("[data-playground-calculator-resize-handle]")
     const dragHandle = target.closest("[data-calculator-drag-handle]")
     const hiddenLauncher = target.closest("[data-calculator-hidden-launcher]")
-    if (!resizeHandle && !dragHandle && !hiddenLauncher) return
+    if (!resizeHandle && !dragHandle && !hiddenLauncher) {
+      return
+    }
 
     if (
       dragHandle &&
@@ -221,7 +267,9 @@ export function PlaygroundCalculatorPreview({
     }
 
     event.preventDefault()
-    if (resizeHandle) event.stopPropagation()
+    if (resizeHandle) {
+      event.stopPropagation()
+    }
     interactionCleanupRef.current?.()
 
     const interaction: FrameInteraction = {
@@ -238,7 +286,9 @@ export function PlaygroundCalculatorPreview({
     const move = (pointerEvent: PointerEvent) => {
       const activeInteraction = interactionRef.current
       const frame = frameRef.current
-      if (!activeInteraction || !frame) return
+      if (!activeInteraction || !frame) {
+        return
+      }
 
       const deltaX = pointerEvent.clientX - activeInteraction.startClientX
       const deltaY = pointerEvent.clientY - activeInteraction.startClientY
@@ -255,7 +305,9 @@ export function PlaygroundCalculatorPreview({
               width: activeInteraction.startGeometry.width + deltaX,
               height: activeInteraction.startGeometry.height + deltaY,
             }
-      activeInteraction.lastGeometry = constrainFrameGeometry(requestedGeometry, previewBounds)
+      activeInteraction.lastGeometry = activeInteraction.draggedLauncher
+        ? constrainHiddenFrameGeometry(requestedGeometry, previewBounds)
+        : constrainFrameGeometry(requestedGeometry, previewBounds)
       applyFrameGeometry(frame, activeInteraction.lastGeometry)
     }
 
@@ -269,7 +321,15 @@ export function PlaygroundCalculatorPreview({
     const end = () => {
       const activeInteraction = interactionRef.current
       if (activeInteraction) {
-        setFrameGeometry(activeInteraction.lastGeometry)
+        setFrameGeometry((current) =>
+          activeInteraction.draggedLauncher
+            ? {
+                ...current,
+                x: activeInteraction.lastGeometry.x,
+                y: activeInteraction.lastGeometry.y,
+              }
+            : activeInteraction.lastGeometry
+        )
         suppressLauncherClickRef.current =
           activeInteraction.draggedLauncher && activeInteraction.moved
       }
@@ -288,7 +348,7 @@ export function PlaygroundCalculatorPreview({
       ref={previewRef}
       data-playground-calculator-preview=""
       data-theme={resolvedTheme}
-      className={`relative isolate min-h-[560px] w-full min-w-0 max-w-full overflow-hidden bg-background ${showBackdrop ? "h-[760px]" : "h-[700px]"} ${resolvedTheme}`}
+      className={`relative isolate min-h-140 w-full min-w-0 max-w-full overflow-hidden bg-background ${showBackdrop ? "h-190" : "h-175"} ${resolvedTheme}`}
     >
       {showBackdrop ? (
         <PracticeBackdrop theme={resolvedTheme} />
@@ -302,9 +362,10 @@ export function PlaygroundCalculatorPreview({
       <div
         ref={frameRef}
         data-playground-calculator-frame=""
+        data-hidden={activeHidden ? "true" : "false"}
         data-min-height={PLAYGROUND_CALCULATOR_GEOMETRY.minHeight}
         data-min-width={PLAYGROUND_CALCULATOR_GEOMETRY.minWidth}
-        className="absolute min-h-0 min-w-0 max-h-[calc(100%_-_2rem)] max-w-[calc(100%_-_2rem)] touch-none [&_[data-calculator-drag-handle]]:cursor-grab [&_[data-calculator-drag-handle]]:active:cursor-grabbing"
+        className="absolute min-h-0 min-w-0 max-h-[calc(100%-2rem)] max-w-[calc(100%-2rem)] touch-none **:data-calculator-drag-handle:cursor-grab **:data-calculator-drag-handle:active:cursor-grabbing"
         style={{
           left: constrainedGeometry.x,
           top: constrainedGeometry.y,
@@ -312,6 +373,19 @@ export function PlaygroundCalculatorPreview({
           height: constrainedGeometry.height,
         }}
         onPointerDownCapture={startFrameInteraction}
+        onKeyDownCapture={(event) => {
+          switch (event.key) {
+            case "Enter":
+            case " ":
+              if (
+                event.target instanceof HTMLElement &&
+                event.target.closest("[data-calculator-hidden-launcher]")
+              ) {
+                suppressLauncherClickRef.current = false
+              }
+              break
+          }
+        }}
         onClickCapture={(event) => {
           if (
             suppressLauncherClickRef.current &&
@@ -323,15 +397,23 @@ export function PlaygroundCalculatorPreview({
           }
         }}
       >
-        <MiraiCalculator {...calculatorProps} theme={theme} defaultTheme={defaultTheme} />
-        <button
-          type="button"
-          aria-label="Resize calculator"
-          data-playground-calculator-resize-handle=""
-          className="absolute right-0 bottom-0 z-50 flex size-6 cursor-nwse-resize touch-none items-center justify-center bg-transparent text-muted-foreground/70 outline-none hover:text-foreground focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <CalculatorResizeGrip />
-        </button>
+        <MiraiCalculator
+          {...calculatorProps}
+          theme={theme}
+          defaultTheme={defaultTheme}
+          hidden={activeHidden}
+          onHiddenChange={setHidden}
+        />
+        {!activeHidden && (
+          <button
+            type="button"
+            aria-label="Resize calculator"
+            data-playground-calculator-resize-handle=""
+            className="absolute right-0 bottom-0 z-50 flex size-6 cursor-nwse-resize touch-none items-center justify-center bg-transparent text-muted-foreground/70 outline-none hover:text-foreground focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <CalculatorResizeGrip />
+          </button>
+        )}
       </div>
     </div>
   )

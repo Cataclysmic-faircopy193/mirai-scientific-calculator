@@ -1,12 +1,12 @@
 import { calculateStatistics, correlation, covariance, quantile } from "./statistics"
 
 export type AngleMode = "degrees" | "radians"
-export type CalculatorValue = number | boolean | number[]
+export type CalculatorValue = number | boolean | Array<number>
 
 export interface CalculatorEngineOptions {
   angleMode?: AngleMode
   ans?: number
-  definitions?: string[]
+  definitions?: Array<string>
   variables?: Record<string, number>
 }
 
@@ -70,13 +70,13 @@ interface AstNode {
   relation?: string
   name?: string
   functionName?: string
-  args?: AstNode[]
-  items?: AstNode[]
+  args?: Array<AstNode>
+  items?: Array<AstNode>
   clauses?: Array<{ condition: AstNode | null; value: AstNode }>
 }
 
 interface FunctionDefinition {
-  parameters: string[]
+  parameters: Array<string>
   source: string
 }
 
@@ -97,14 +97,49 @@ const TOKEN_REPLACEMENTS: Array<[string, string]> = [
   ["π", "pi"],
   ["√", "sqrt"],
   ["∛", "cbrt"],
-  ["²", "^2"],
-  ["³", "^3"],
   ["·", "*"],
   ["≤", "<="],
   ["≥", ">="],
   ["≠", "!="],
-  ["⁻¹", "^-1"],
 ]
+
+const ASCII_TO_SUPERSCRIPT: Readonly<Record<string, string>> = {
+  "-": "⁻",
+  "−": "⁻",
+  "0": "⁰",
+  "1": "¹",
+  "2": "²",
+  "3": "³",
+  "4": "⁴",
+  "5": "⁵",
+  "6": "⁶",
+  "7": "⁷",
+  "8": "⁸",
+  "9": "⁹",
+}
+
+const SUPERSCRIPT_TO_ASCII: Readonly<Record<string, string>> = {
+  "⁻": "-",
+  "⁰": "0",
+  "¹": "1",
+  "²": "2",
+  "³": "3",
+  "⁴": "4",
+  "⁵": "5",
+  "⁶": "6",
+  "⁷": "7",
+  "⁸": "8",
+  "⁹": "9",
+}
+
+const SUPERSCRIPT_RUN_PATTERN = /[⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+/g
+
+/** Converts a run of superscript digits back into its parser representation. */
+function parseSuperscriptRun(power: string): string {
+  return Array.from(power)
+    .map((character) => SUPERSCRIPT_TO_ASCII[character] ?? character)
+    .join("")
+}
 
 const FUNCTION_NAMES = [
   "arcsin",
@@ -237,7 +272,56 @@ const MAX_AST_CACHE_ENTRIES = 256
 const MAX_DEFINITIONS = 128
 const MAX_VARIABLES = 128
 
-function isNumericArray(value: CalculatorValue): value is number[] {
+/** Appends only unambiguous missing closing parentheses before explicit evaluation. */
+export function completeExpression(expression: string): string {
+  const source = expression
+  let openParentheses = 0
+
+  for (const character of source) {
+    if (character === "(") {
+      openParentheses += 1
+      continue
+    }
+    if (character !== ")") {
+      continue
+    }
+    if (openParentheses === 0) {
+      return source
+    }
+    openParentheses -= 1
+  }
+
+  return openParentheses === 0 ? source : `${source}${")".repeat(openParentheses)}`
+}
+
+/** Converts keyboard-friendly aliases into compact, engine-compatible mathematical notation. */
+export function formatExpressionInput(expression: string): string {
+  return expression
+    .replace(/([⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+)\./g, (_, power: string) => `^${parseSuperscriptRun(power)}.`)
+    .replace(/\^([-−]?\d+)(?![\d.])/g, (_, exponent: string) =>
+      Array.from(exponent)
+        .map((character) => ASCII_TO_SUPERSCRIPT[character] ?? character)
+        .join("")
+    )
+    .replace(
+      /([⁻⁰¹²³⁴⁵⁶⁷⁸⁹])(\d+)/g,
+      (_, power: string, digits: string) =>
+        `${power}${Array.from(digits)
+          .map((character) => ASCII_TO_SUPERSCRIPT[character] ?? character)
+          .join("")}`
+    )
+    .replace(/sqrt/gi, "√")
+    .replace(/cbrt/gi, "∛")
+    .replace(/pi/gi, "π")
+    .replace(/<=/g, "≤")
+    .replace(/>=/g, "≥")
+    .replace(/!=/g, "≠")
+    .replace(/\*/g, "×")
+    .replace(/\//g, "÷")
+    .replace(/-/g, "−")
+}
+
+function isNumericArray(value: CalculatorValue): value is Array<number> {
   return Array.isArray(value)
 }
 
@@ -249,8 +333,12 @@ function asNumber(value: CalculatorValue): number {
 }
 
 function cleanNumber(value: number): number {
-  if (Math.abs(value) < 1e-12) return 0
-  if (Math.abs(value - Math.round(value)) < 1e-12) return Math.round(value)
+  if (Math.abs(value) < 1e-12) {
+    return 0
+  }
+  if (Math.abs(value - Math.round(value)) < 1e-12) {
+    return Math.round(value)
+  }
   return value
 }
 
@@ -262,17 +350,41 @@ function shiftDecimal(value: number, exponent: number): number {
 function roundDecimal(value: number, precision: number): number {
   const absolute = Math.abs(value)
   const shifted = shiftDecimal(absolute, precision)
-  if (!Number.isFinite(shifted)) return value
+  if (!Number.isFinite(shifted)) {
+    return value
+  }
 
   const rounded = Math.floor(shifted + 0.5)
   const result = shiftDecimal(rounded, -precision)
-  if (result === 0) return 0
+  if (result === 0) {
+    return 0
+  }
   return value < 0 ? -result : result
 }
 
 function approximatelyEqual(left: number, right: number): boolean {
-  if (left === right) return true
+  if (left === right) {
+    return true
+  }
   return Math.abs(left - right) <= Number.EPSILON * 4 * Math.max(1, Math.abs(left), Math.abs(right))
+}
+
+function compareNumbers(relation: string | undefined, left: number, right: number): boolean {
+  switch (relation) {
+    case "<":
+      return left < right
+    case ">":
+      return left > right
+    case "<=":
+      return left <= right
+    case ">=":
+      return left >= right
+    case "!=":
+      return !approximatelyEqual(left, right)
+    case "=":
+    default:
+      return approximatelyEqual(left, right)
+  }
 }
 
 function validateFiniteRecord(values: Record<string, number>, label: string): void {
@@ -309,10 +421,14 @@ export function factorial(value: number): number {
   if (value < 0 || !Number.isInteger(value)) {
     throw new Error("Factorial needs a non-negative whole number")
   }
-  if (value > 170) throw new Error("Result is too large to display")
+  if (value > 170) {
+    throw new Error("Result is too large to display")
+  }
 
   let result = 1
-  for (let current = 2; current <= value; current += 1) result *= current
+  for (let current = 2; current <= value; current += 1) {
+    result *= current
+  }
   return result
 }
 
@@ -351,7 +467,7 @@ function combinations(n: number, r: number): number {
 export class CalculatorEngine {
   private angleMode: AngleMode = "degrees"
   private ans = 0
-  private definitions: string[] = []
+  private definitions: Array<string> = []
   private variables: Record<string, number> = {}
   private readonly astCache = new Map<string, AstNode>()
 
@@ -370,16 +486,18 @@ export class CalculatorEngine {
   }
 
   setAns(ans: number) {
-    if (!Number.isFinite(ans)) throw new Error("Ans must be a finite number")
+    if (!Number.isFinite(ans)) {
+      throw new Error("Ans must be a finite number")
+    }
     this.ans = ans
   }
 
-  setDefinitions(definitions: string[]) {
+  setDefinitions(definitions: Array<string>) {
     if (definitions.length > MAX_DEFINITIONS) {
       throw new Error("Too many definitions")
     }
     for (const definition of definitions) {
-      if (String(definition).length > MAX_EXPRESSION_LENGTH) {
+      if (definition.length > MAX_EXPRESSION_LENGTH) {
         throw new Error("Definition is too long")
       }
     }
@@ -393,20 +511,27 @@ export class CalculatorEngine {
   }
 
   evaluate(expression: string, locals: Record<string, number> = {}): CalculatorValue {
-    let source = String(expression)
-    if (!source.trim()) throw new Error("Enter an expression")
+    let source = expression
+    if (!source.trim()) {
+      throw new Error("Enter an expression")
+    }
     validateFiniteRecord(locals, "Local variables")
     const hasXVariable =
       Object.keys(locals).some((name) => name.toLowerCase() === "x") ||
       Object.keys(this.variables).some((name) => name.toLowerCase() === "x") ||
       this.definitions.some((definition) => /^x\s*=/.test(definition.trim().toLowerCase()))
-    if (!hasXVariable) source = source.replace(/\s+[xX]\s+/g, " * ")
+    if (!hasXVariable) {
+      source = source.replace(/\s+[xX]\s+/g, " * ")
+    }
     const result = this.evaluateNode(this.parseCached(source), this.createScope(locals))
     return this.ensureSupportedResult(result)
   }
 
   normalize(expression: string): string {
-    let normalized = String(expression)
+    let normalized = expression.replace(
+      SUPERSCRIPT_RUN_PATTERN,
+      (power) => `^${parseSuperscriptRun(power)}`
+    )
     for (const [source, target] of TOKEN_REPLACEMENTS) {
       normalized = normalized.split(source).join(target)
     }
@@ -418,7 +543,9 @@ export class CalculatorEngine {
   }
 
   format(value: CalculatorValue, options: NumberFormatOptions = {}): string {
-    if (typeof value === "boolean") return value ? "true" : "false"
+    if (typeof value === "boolean") {
+      return value ? "true" : "false"
+    }
     if (Array.isArray(value)) {
       const visible = value
         .slice(0, 12)
@@ -426,8 +553,12 @@ export class CalculatorEngine {
         .join(", ")
       return `[${visible}${value.length > 12 ? ", …" : ""}]`
     }
-    if (!Number.isFinite(value)) return "—"
-    if (value === 0) return "0"
+    if (!Number.isFinite(value)) {
+      return "—"
+    }
+    if (value === 0) {
+      return "0"
+    }
 
     const significantFigures = Math.max(1, Math.min(15, options.significantFigures ?? 12))
     const absolute = Math.abs(value)
@@ -451,8 +582,12 @@ export class CalculatorEngine {
   }
 
   toFraction(value: number, maximumDenominator = 9999): string | null {
-    if (!Number.isFinite(value)) return null
-    if (Number.isInteger(value)) return String(value)
+    if (!Number.isFinite(value)) {
+      return null
+    }
+    if (Number.isInteger(value)) {
+      return String(value)
+    }
 
     const sign = value < 0 ? -1 : 1
     const target = Math.abs(value)
@@ -471,7 +606,9 @@ export class CalculatorEngine {
         break
       }
       const remainder = x - whole
-      if (remainder < 1e-12) break
+      if (remainder < 1e-12) {
+        break
+      }
       x = 1 / remainder
     }
 
@@ -485,7 +622,7 @@ export class CalculatorEngine {
     return `${sign * numerator}/${denominator}`
   }
 
-  private tokenize(source: string): Token[] {
+  private tokenize(source: string): Array<Token> {
     if (source.length > MAX_EXPRESSION_LENGTH) {
       throw new Error("Expression is too long")
     }
@@ -493,7 +630,7 @@ export class CalculatorEngine {
     if (expression.length > MAX_EXPRESSION_LENGTH) {
       throw new Error("Expression is too long")
     }
-    const tokens: Token[] = []
+    const tokens: Array<Token> = []
     let index = 0
     const addToken = (token: Token) => {
       if (tokens.length >= MAX_TOKENS) {
@@ -511,7 +648,9 @@ export class CalculatorEngine {
           throw new Error("Invalid number")
         }
         const number = Number(match[0])
-        if (!Number.isFinite(number)) throw new Error("Invalid number")
+        if (!Number.isFinite(number)) {
+          throw new Error("Invalid number")
+        }
         addToken({ type: "number", value: number })
         index += match[0].length
         continue
@@ -568,7 +707,9 @@ export class CalculatorEngine {
     let position = 0
     const peek = () => tokens[position]
     const eat = (type: Token["type"]) => {
-      if (tokens[position]?.type !== type) return false
+      if (tokens[position]?.type !== type) {
+        return false
+      }
       position += 1
       return true
     }
@@ -635,7 +776,9 @@ export class CalculatorEngine {
       if (eat("-")) {
         return { op: "negative", left: parseUnary(stopAtAbsoluteBar) }
       }
-      if (eat("+")) return parseUnary(stopAtAbsoluteBar)
+      if (eat("+")) {
+        return parseUnary(stopAtAbsoluteBar)
+      }
       return parsePower(stopAtAbsoluteBar)
     }
 
@@ -677,21 +820,29 @@ export class CalculatorEngine {
       return base
     }
 
-    const parseArguments = (): AstNode[] => {
-      if (eat(")")) return []
+    const parseArguments = (): Array<AstNode> => {
+      if (eat(")")) {
+        return []
+      }
       const args = [parseTop()]
-      while (eat(",")) args.push(parseTop())
-      if (!eat(")")) throw new Error("Missing closing parenthesis")
+      while (eat(",")) {
+        args.push(parseTop())
+      }
+      if (!eat(")")) {
+        throw new Error("Missing closing parenthesis")
+      }
       return args
     }
 
     const parseAtom = (stopAtAbsoluteBar = false): AstNode => {
       const token = peek()
-      if (!token) throw new Error("Expression is incomplete")
+      if (!token) {
+        throw new Error("Expression is incomplete")
+      }
 
       if (token.type === "number") {
         position += 1
-        return { op: "number", value: token.value as number }
+        return { op: "number", value: token.value }
       }
 
       if (token.type === "variable") {
@@ -704,10 +855,16 @@ export class CalculatorEngine {
       }
 
       if (eat("[")) {
-        if (eat("]")) return { op: "list", items: [] }
+        if (eat("]")) {
+          return { op: "list", items: [] }
+        }
         const items = [parseTop()]
-        while (eat(",")) items.push(parseTop())
-        if (!eat("]")) throw new Error("Missing closing bracket")
+        while (eat(",")) {
+          items.push(parseTop())
+        }
+        if (!eat("]")) {
+          throw new Error("Missing closing bracket")
+        }
         return { op: "list", items }
       }
 
@@ -721,7 +878,9 @@ export class CalculatorEngine {
             clauses.push({ condition: null, value: first })
           }
         } while (eat(","))
-        if (!eat("}")) throw new Error("Missing closing brace in piecewise")
+        if (!eat("}")) {
+          throw new Error("Missing closing brace in piecewise")
+        }
         return { op: "piecewise", clauses }
       }
 
@@ -740,13 +899,17 @@ export class CalculatorEngine {
 
       if (eat("(")) {
         const node = parseTop()
-        if (!eat(")")) throw new Error("Missing closing parenthesis")
+        if (!eat(")")) {
+          throw new Error("Missing closing parenthesis")
+        }
         return node
       }
 
       if (eat("|")) {
         const node = parseTop(true)
-        if (!eat("|")) throw new Error("Missing closing absolute-value bar")
+        if (!eat("|")) {
+          throw new Error("Missing closing absolute-value bar")
+        }
         return { op: "call", functionName: "abs", args: [node] }
       }
 
@@ -754,7 +917,9 @@ export class CalculatorEngine {
     }
 
     const root = parseTop()
-    if (position < tokens.length) throw new Error("Unexpected symbol")
+    if (position < tokens.length) {
+      throw new Error("Unexpected symbol")
+    }
     return root
   }
 
@@ -768,7 +933,9 @@ export class CalculatorEngine {
     const ast = this.parse(source)
     if (this.astCache.size >= MAX_AST_CACHE_ENTRIES) {
       const oldest = this.astCache.keys().next().value
-      if (oldest !== undefined) this.astCache.delete(oldest)
+      if (oldest !== undefined) {
+        this.astCache.delete(oldest)
+      }
     }
     this.astCache.set(source, ast)
     return ast
@@ -784,7 +951,9 @@ export class CalculatorEngine {
 
     for (const definition of this.definitions) {
       const equals = definition.indexOf("=")
-      if (equals < 1) continue
+      if (equals < 1) {
+        continue
+      }
       const left = definition.slice(0, equals).trim().toLowerCase()
       const source = definition.slice(equals + 1).trim()
       const functionMatch = left.match(/^([a-z])\(([a-z](?:\s*,\s*[a-z])*)\)$/)
@@ -813,12 +982,24 @@ export class CalculatorEngine {
 
   private lookup(name: string, scope: EvaluationScope): number {
     const key = name.toLowerCase()
-    if (key === "ans") return this.ans
-    if (key === "e") return Math.E
-    if (key === "pi") return Math.PI
-    if (key in scope.locals) return scope.locals[key]
-    if (key in scope.cache) return scope.cache[key]
-    if (!(key in scope.variables)) throw new Error(`Unknown variable "${name}"`)
+    if (key === "ans") {
+      return this.ans
+    }
+    if (key === "e") {
+      return Math.E
+    }
+    if (key === "pi") {
+      return Math.PI
+    }
+    if (key in scope.locals) {
+      return scope.locals[key]
+    }
+    if (key in scope.cache) {
+      return scope.cache[key]
+    }
+    if (!(key in scope.variables)) {
+      throw new Error(`Unknown variable "${name}"`)
+    }
     if (scope.resolving.has(key)) {
       throw new Error(`Circular definition for "${name}"`)
     }
@@ -880,22 +1061,7 @@ export class CalculatorEngine {
         const left = this.evaluateNode(node.left!, scope)
         const right = this.evaluateNode(node.right!, scope)
         const relation = node.relation
-        return this.lift(
-          (a, b) =>
-            relation === "<"
-              ? a < b
-              : relation === ">"
-                ? a > b
-                : relation === "<="
-                  ? a <= b
-                  : relation === ">="
-                    ? a >= b
-                    : relation === "!="
-                      ? !approximatelyEqual(a, b)
-                      : approximatelyEqual(a, b),
-          left,
-          right
-        )
+        return this.lift((a, b) => compareNumbers(relation, a, b), left, right)
       }
       case "piecewise": {
         for (const clause of node.clauses ?? []) {
@@ -910,7 +1076,9 @@ export class CalculatorEngine {
         if (!definition) {
           throw new Error(`Unknown function "${node.name}"`)
         }
-        if (scope.depth > 30) throw new Error("Function recursion limit reached")
+        if (scope.depth > 30) {
+          throw new Error("Function recursion limit reached")
+        }
         const values = (node.args ?? []).map((argument) =>
           asNumber(this.evaluateNode(argument, scope))
         )
@@ -952,7 +1120,9 @@ export class CalculatorEngine {
       case "/":
         return this.lift(
           (a, b) => {
-            if (b === 0) throw new Error("Undefined: division by zero")
+            if (b === 0) {
+              throw new Error("Undefined: division by zero")
+            }
             return a / b
           },
           this.evaluateNode(node.left!, scope),
@@ -994,7 +1164,7 @@ export class CalculatorEngine {
           const expected = minimum === maximum ? String(minimum) : `${minimum} or ${maximum}`
           throw new Error(`${functionName} needs ${expected} ${maximum === 1 ? "value" : "values"}`)
         }
-        const evaluateScalar = (args: number[]) => {
+        const evaluateScalar = (args: Array<number>) => {
           const result = this.evaluateScalarFunction(functionName, args, angleFactor)
           if (!Number.isFinite(result)) {
             throw new Error("Result is outside the supported numeric range")
@@ -1020,10 +1190,14 @@ export class CalculatorEngine {
     }
   }
 
-  private flatten(values: CalculatorValue[]): number[] {
+  private flatten(values: Array<CalculatorValue>): Array<number> {
     return values.flatMap((value) => {
-      if (Array.isArray(value)) return value
-      if (typeof value === "number") return [value]
+      if (Array.isArray(value)) {
+        return value
+      }
+      if (typeof value === "number") {
+        return [value]
+      }
       throw new Error("List functions need numeric values")
     })
   }
@@ -1038,7 +1212,7 @@ export class CalculatorEngine {
 
   private evaluateListFunction(
     functionName: string,
-    rawValues: CalculatorValue[]
+    rawValues: Array<CalculatorValue>
   ): CalculatorValue {
     if (functionName === "corr" || functionName === "cov") {
       if (rawValues.length !== 2 || !Array.isArray(rawValues[0]) || !Array.isArray(rawValues[1])) {
@@ -1065,12 +1239,14 @@ export class CalculatorEngine {
         throw new Error("quantile percentile must be between 0 and 1")
       }
       const sample = [...rawValues[0]].sort((a, b) => a - b)
-      if (sample.length === 0) throw new Error("Not enough data for quantile")
+      if (sample.length === 0) {
+        throw new Error("Not enough data for quantile")
+      }
       return quantile(sample, percentile)
     }
 
     if (functionName === "quartile") {
-      let sample: number[]
+      let sample: Array<number>
       let quartileIndex = 1
       if (rawValues.length === 2 && Array.isArray(rawValues[0])) {
         if (typeof rawValues[1] !== "number") {
@@ -1088,7 +1264,9 @@ export class CalculatorEngine {
       if (!Number.isInteger(quartileIndex) || quartileIndex < 0 || quartileIndex > 4) {
         throw new Error("quartile index must be a whole number from 0 to 4")
       }
-      if (sample.length === 0) throw new Error("Not enough data for quartile")
+      if (sample.length === 0) {
+        throw new Error("Not enough data for quartile")
+      }
       return quantile(
         [...sample].sort((a, b) => a - b),
         quartileIndex / 4
@@ -1113,7 +1291,9 @@ export class CalculatorEngine {
       case "median":
         return statistics.median
       case "mode":
-        if (statistics.mode === null) throw new Error("The data has no mode")
+        if (statistics.mode === null) {
+          throw new Error("The data has no mode")
+        }
         return statistics.mode
       case "min":
         return statistics.min
@@ -1146,7 +1326,7 @@ export class CalculatorEngine {
 
   private evaluateScalarFunction(
     functionName: string,
-    args: number[],
+    args: Array<number>,
     angleFactor: number
   ): number {
     if (args.some((value) => !Number.isFinite(value))) {
@@ -1214,22 +1394,30 @@ export class CalculatorEngine {
       }
       case "asin":
       case "arcsin":
-        if (Math.abs(args[0]) > 1) throw new Error("Result is not a real number")
+        if (Math.abs(args[0]) > 1) {
+          throw new Error("Result is not a real number")
+        }
         return inverseAngle(Math.asin(args[0]))
       case "acos":
       case "arccos":
-        if (Math.abs(args[0]) > 1) throw new Error("Result is not a real number")
+        if (Math.abs(args[0]) > 1) {
+          throw new Error("Result is not a real number")
+        }
         return inverseAngle(Math.acos(args[0]))
       case "atan":
       case "arctan":
         return inverseAngle(Math.atan(args[0]))
       case "asec":
       case "arcsec":
-        if (Math.abs(args[0]) < 1) throw new Error("Result is not a real number")
+        if (Math.abs(args[0]) < 1) {
+          throw new Error("Result is not a real number")
+        }
         return inverseAngle(Math.acos(1 / args[0]))
       case "acsc":
       case "arccsc":
-        if (Math.abs(args[0]) < 1) throw new Error("Result is not a real number")
+        if (Math.abs(args[0]) < 1) {
+          throw new Error("Result is not a real number")
+        }
         return inverseAngle(Math.asin(1 / args[0]))
       case "acot":
       case "arccot":
@@ -1241,7 +1429,9 @@ export class CalculatorEngine {
       case "tanh":
         return Math.tanh(args[0])
       case "sqrt":
-        if (args[0] < 0) throw new Error("Result is not a real number")
+        if (args[0] < 0) {
+          throw new Error("Result is not a real number")
+        }
         return Math.sqrt(args[0])
       case "cbrt":
         return Math.cbrt(args[0])
@@ -1282,7 +1472,9 @@ export class CalculatorEngine {
       case "ceil":
         return Math.ceil(args[0])
       case "round":
-        if (args.length === 1) return roundDecimal(args[0], 0)
+        if (args.length === 1) {
+          return roundDecimal(args[0], 0)
+        }
         if (!Number.isInteger(args[1]) || Math.abs(args[1]) > 100) {
           throw new Error("round precision must be a whole number from −100 to 100")
         }
@@ -1297,7 +1489,9 @@ export class CalculatorEngine {
         if (!Number.isSafeInteger(args[0]) || !Number.isSafeInteger(args[1])) {
           throw new Error("lcm needs safe whole numbers")
         }
-        if (args[0] === 0 || args[1] === 0) return 0
+        if (args[0] === 0 || args[1] === 0) {
+          return 0
+        }
         return Math.abs((args[0] / greatestCommonDivisor(args[0], args[1])) * args[1])
       case "mod":
         need(2)

@@ -1,7 +1,8 @@
 import { Highlight } from "prism-react-renderer"
 
 import { cn } from "@/lib/utils"
-import { CODE_THEME, PRISM_LANGUAGES, type CodeLanguage } from "@/site/constants/code"
+import { CODE_THEME, PRISM_LANGUAGES } from "@/site/constants/code"
+import type { CodeLanguage } from "@/site/constants/code"
 
 /** Tokenizes TypeScript source into an accessible syntax-highlighted code block. */
 export function HighlightedCode({
@@ -23,7 +24,7 @@ export function HighlightedCode({
           aria-label={ariaLabel}
           className={cn(
             prismClassName,
-            "overflow-auto bg-[#011627] p-5 font-mono text-[13px] leading-6",
+            "overflow-auto bg-[#011627] p-5 font-mono text-sm leading-6",
             className
           )}
           style={{ ...style, background: undefined }}

@@ -1,11 +1,11 @@
-import {
-  CalculatorExtension,
-  type CalculatorExtension as CalculatorExtensionValue,
-  type CalculatorTheme,
-  type GraphingInitialData,
-  type StatisticsInitialData,
-  type ToolsInitialData,
-} from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
+import type {
+  CalculatorExtension as CalculatorExtensionValue,
+  CalculatorTheme,
+} from "@openmirai/calculator-core/configuration"
+import type { GraphingInitialData } from "@openmirai/calculator-core/graphing-data"
+import type { StatisticsInitialData } from "@openmirai/calculator-core/statistics-data"
+import type { ToolsInitialData } from "@openmirai/calculator-core/tools"
 
 export interface PlaygroundSearch {
   extensions: string
@@ -89,27 +89,26 @@ export const PLAYGROUND_CALCULATOR_GEOMETRY = {
   defaultY: 76,
   minWidth: 320,
   minHeight: 520,
+  hiddenSize: 48,
   boundaryGap: 16,
 } as const
 
-export const CALCULATOR_THEME_OPTIONS: readonly {
+export const CALCULATOR_THEME_OPTIONS: ReadonlyArray<{
   label: string
   value: CalculatorTheme
-}[] = [
+}> = [
   { label: "System", value: "system" },
   { label: "Light", value: "light" },
   { label: "Dark", value: "dark" },
 ]
 
-export const PLAYGROUND_SNIPPET_PREFIX = `import {
-  CalculatorExtension,
-  MiraiCalculator,
-  type StatisticsInitialData,
-  type ToolsInitialData,
-} from "@/components/mirai-calculator/mirai-calculator"`
+export const PLAYGROUND_SNIPPET_PREFIX = `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
+import type { StatisticsInitialData } from "@openmirai/calculator-core/statistics-data"
+import type { ToolsInitialData } from "@openmirai/calculator-core/tools"`
 
 /** Parses a serialized extension list while preserving supported first occurrence order. */
-export function parsePlaygroundExtensions(value: string): CalculatorExtensionValue[] {
+export function parsePlaygroundExtensions(value: string): Array<CalculatorExtensionValue> {
   const supported = new Set<unknown>(DEFAULT_PLAYGROUND_EXTENSIONS)
   return [
     ...new Set(
@@ -123,20 +122,22 @@ export function parsePlaygroundExtensions(value: string): CalculatorExtensionVal
 
 /** Serializes configured calculator extensions for the playground URL. */
 export function serializePlaygroundExtensions(
-  extensions: readonly CalculatorExtensionValue[]
+  extensions: ReadonlyArray<CalculatorExtensionValue>
 ): string {
   return extensions.join(",")
 }
 
 /** Moves an enabled extension by one position without changing disabled options. */
 export function movePlaygroundExtension(
-  extensions: readonly CalculatorExtensionValue[],
+  extensions: ReadonlyArray<CalculatorExtensionValue>,
   extension: CalculatorExtensionValue,
   direction: -1 | 1
-): CalculatorExtensionValue[] {
+): Array<CalculatorExtensionValue> {
   const currentIndex = extensions.indexOf(extension)
   const nextIndex = currentIndex + direction
-  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= extensions.length) return [...extensions]
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= extensions.length) {
+    return [...extensions]
+  }
 
   const nextExtensions = [...extensions]
   const [selected] = nextExtensions.splice(currentIndex, 1)
@@ -146,9 +147,9 @@ export function movePlaygroundExtension(
 
 /** Orders enabled extension controls first, followed by disabled controls in catalog order. */
 export function orderPlaygroundExtensionOptions<Extension extends { id: CalculatorExtensionValue }>(
-  extensions: readonly CalculatorExtensionValue[],
-  catalog: readonly Extension[]
-): Extension[] {
+  extensions: ReadonlyArray<CalculatorExtensionValue>,
+  catalog: ReadonlyArray<Extension>
+): Array<Extension> {
   const catalogById = new Map(catalog.map((extension) => [extension.id, extension]))
   const enabledExtensions = new Set(extensions)
   return [
@@ -199,7 +200,7 @@ export function createPlaygroundSnippet({
   statisticsData,
   toolsData,
 }: {
-  extensions: readonly CalculatorExtensionValue[]
+  extensions: ReadonlyArray<CalculatorExtensionValue>
   mode?: CalculatorExtensionValue
   calculatorTheme: CalculatorTheme
   statisticsData: StatisticsInitialData

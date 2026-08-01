@@ -11,7 +11,9 @@ async function copyDeclarations(directory) {
       continue
     }
 
-    if (!entry.name.endsWith(".d.ts")) continue
+    if (!entry.name.endsWith(".d.ts")) {
+      continue
+    }
     await copyFile(source, source.replace(/\.d\.ts$/, ".d.cts"))
   }
 }

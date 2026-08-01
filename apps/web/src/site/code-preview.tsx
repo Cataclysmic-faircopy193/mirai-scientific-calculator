@@ -1,4 +1,3 @@
-import type { ReactNode } from "react"
 import { Code2, Eye } from "lucide-react"
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -15,7 +14,7 @@ export function CodePreview({
   code,
   previewLabel,
 }: {
-  preview: ReactNode
+  preview: React.ReactNode
   code: string
   previewLabel: string
 }) {
@@ -40,7 +39,7 @@ export function CodePreview({
           <TabsContent value={CODE_TAB} aria-label={`${previewLabel} code`}>
             <HighlightedCode
               ariaLabel={`${previewLabel} source code`}
-              className="max-h-[640px]"
+              className="max-h-160"
               code={code}
               language="tsx"
             />

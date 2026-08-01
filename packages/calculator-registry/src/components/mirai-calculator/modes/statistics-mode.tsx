@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { BarChart3, LineChart } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -7,68 +7,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { useStatisticsChart } from "@/components/mirai-calculator/modes/use-statistics-chart"
 import {
-  CALCULATOR_CHART_COLORS,
-  resolveCssColorToken,
-} from "@openmirai/calculator-core/configuration"
+  STATISTICS_CHART_OPTIONS,
+  STATISTICS_REGRESSION_OPTIONS,
+} from "@/components/mirai-calculator/modes/statistics-config"
+import type { StatisticsChartType } from "@/components/mirai-calculator/modes/statistics-config"
 import {
-  calculateNumberExtent,
   calculateStatistics,
   correlation,
   covariance,
   fitRegression,
+} from "@openmirai/calculator-core/statistics"
+import type { RegressionModel } from "@openmirai/calculator-core/statistics"
+import {
+  pairNumberSeries,
   parseNumberList,
   serializeNumberList,
-  type RegressionModel,
-} from "@openmirai/calculator-core/statistics"
+} from "@openmirai/calculator-core/statistics-data"
+import type { StatisticsInitialData } from "@openmirai/calculator-core/statistics-data"
 import { cn } from "@/lib/utils"
-
-type ChartType = "scatter" | "histogram" | "box" | "dot" | "residual"
 
 export interface StatisticsModeProps {
   formatNumber: (value: number) => string
   colorScheme?: "light" | "dark"
   defaultData?: StatisticsInitialData
-}
-
-/** Initial values supplied by a consumer to the statistics workspace. */
-export interface StatisticsInitialData {
-  xValues?: readonly (number | string)[]
-  yValues?: readonly (number | string)[]
-}
-
-const CHARTS: Array<{ value: ChartType; label: string }> = [
-  { value: "scatter", label: "Scatter" },
-  { value: "histogram", label: "Histogram" },
-  { value: "box", label: "Box plot" },
-  { value: "dot", label: "Dot plot" },
-  { value: "residual", label: "Residuals" },
-]
-const MODELS: Array<{ value: RegressionModel; label: string }> = [
-  { value: "linear", label: "Linear" },
-  { value: "quadratic", label: "Quadratic" },
-  { value: "cubic", label: "Cubic" },
-  { value: "exponential", label: "Exponential" },
-  { value: "logarithmic", label: "Logarithmic" },
-  { value: "power", label: "Power" },
-]
-
-function canvasColor(element: Element, name: string) {
-  const computed = getComputedStyle(element)
-  return (
-    computed.getPropertyValue(name).trim() ||
-    (name === "--background" ? computed.backgroundColor : computed.color)
-  )
-}
-
-function canvasChartColor(element: Element, token: string) {
-  const computed = getComputedStyle(element)
-  const property = token.slice(4, -1)
-  return resolveCssColorToken(
-    token,
-    { [property]: computed.getPropertyValue(property) },
-    computed.color
-  )
 }
 
 /** Renders descriptive statistics, regression, and distribution tools. */
@@ -79,7 +42,7 @@ export function StatisticsMode({
 }: StatisticsModeProps) {
   const [xSource, setXSource] = useState(() => serializeNumberList(defaultData?.xValues))
   const [ySource, setYSource] = useState(() => serializeNumberList(defaultData?.yValues))
-  const [chart, setChart] = useState<ChartType>("scatter")
+  const [chart, setChart] = useState<StatisticsChartType>("scatter")
   const [model, setModel] = useState<RegressionModel>("linear")
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const canvasHostRef = useRef<HTMLDivElement>(null)
@@ -98,10 +61,7 @@ export function StatisticsMode({
     () => fitRegression(xValues, yValues, model),
     [model, xValues, yValues]
   )
-  const pairedValues = useMemo(() => {
-    const pairCount = Math.min(xValues.length, yValues.length)
-    return { x: xValues.slice(0, pairCount), y: yValues.slice(0, pairCount) }
-  }, [xValues, yValues])
+  const pairedValues = useMemo(() => pairNumberSeries(xValues, yValues), [xValues, yValues])
   const { correlationValue, covarianceValue } = useMemo(() => {
     try {
       return {
@@ -112,190 +72,29 @@ export function StatisticsMode({
       return { correlationValue: Number.NaN, covarianceValue: Number.NaN }
     }
   }, [pairedValues])
+  const residualRows = useMemo(() => {
+    const occurrences = new Map<string, number>()
+    return regression.residuals.slice(0, 12).map((residual, index) => {
+      const x = pairedValues.x[index]
+      const y = pairedValues.y[index]
+      const signature = `${x}:${y}:${residual}`
+      const occurrence = (occurrences.get(signature) ?? 0) + 1
+      occurrences.set(signature, occurrence)
+      return { key: `${signature}:${occurrence}`, residual, x }
+    })
+  }, [pairedValues, regression.residuals])
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const host = canvasHostRef.current
-    if (!canvas || !host) return
-
-    const draw = () => {
-      const bounds = host.getBoundingClientRect()
-      const width = Math.max(1, Math.floor(bounds.width))
-      const height = Math.max(1, Math.floor(bounds.height))
-      const ratio = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = width * ratio
-      canvas.height = height * ratio
-      canvas.style.width = `${width}px`
-      canvas.style.height = `${height}px`
-      const context = canvas.getContext("2d")
-      if (!context) return
-      context.setTransform(ratio, 0, 0, ratio, 0, 0)
-
-      const background = canvasColor(canvas, "--background")
-      const border = canvasColor(canvas, "--border")
-      const foreground = canvasColor(canvas, "--foreground")
-      const muted = canvasColor(canvas, "--muted-foreground")
-      const primary = canvasChartColor(canvas, CALCULATOR_CHART_COLORS[0])
-      const secondary = canvasChartColor(canvas, CALCULATOR_CHART_COLORS[1])
-      const padding = { top: 28, right: 28, bottom: 38, left: 48 }
-      const plotWidth = width - padding.left - padding.right
-      const plotHeight = height - padding.top - padding.bottom
-
-      context.clearRect(0, 0, width, height)
-      context.fillStyle = background
-      context.fillRect(0, 0, width, height)
-      context.font = "11px system-ui, -apple-system, sans-serif"
-      context.fillStyle = muted
-      context.strokeStyle = border
-      context.lineWidth = 1
-
-      const drawAxes = (xRange: [number, number], yRange: [number, number]) => {
-        const mapX = (value: number) =>
-          padding.left + ((value - xRange[0]) / (xRange[1] - xRange[0])) * plotWidth
-        const mapY = (value: number) =>
-          padding.top + (1 - (value - yRange[0]) / (yRange[1] - yRange[0])) * plotHeight
-
-        for (let index = 0; index <= 5; index += 1) {
-          const x = padding.left + (index / 5) * plotWidth
-          const y = padding.top + (index / 5) * plotHeight
-          context.strokeStyle = border
-          context.beginPath()
-          context.moveTo(x, padding.top)
-          context.lineTo(x, padding.top + plotHeight)
-          context.stroke()
-          context.beginPath()
-          context.moveTo(padding.left, y)
-          context.lineTo(padding.left + plotWidth, y)
-          context.stroke()
-          context.fillStyle = muted
-          const xValue = xRange[0] + (index / 5) * (xRange[1] - xRange[0])
-          const yValue = yRange[1] - (index / 5) * (yRange[1] - yRange[0])
-          context.textAlign = "center"
-          context.fillText(formatNumber(xValue), x, height - 14)
-          context.textAlign = "right"
-          context.fillText(formatNumber(yValue), padding.left - 8, y + 4)
-        }
-        return { mapX, mapY }
-      }
-
-      if (chart === "histogram" && xValues.length > 0) {
-        const [minimum, maximum] = calculateNumberExtent(xValues)
-        const binCount = Math.max(4, Math.ceil(Math.sqrt(xValues.length)))
-        const binWidth = (maximum - minimum) / binCount
-        const bins = Array.from({ length: binCount }, () => 0)
-        for (const value of xValues) {
-          const index = Math.min(
-            binCount - 1,
-            Math.max(0, Math.floor((value - minimum) / binWidth))
-          )
-          bins[index] += 1
-        }
-        const { mapX, mapY } = drawAxes([minimum, maximum], [0, Math.max(...bins, 1)])
-        context.fillStyle = primary
-        bins.forEach((count, index) => {
-          const x0 = mapX(minimum + index * binWidth)
-          const x1 = mapX(minimum + (index + 1) * binWidth)
-          const y = mapY(count)
-          context.fillRect(x0 + 1, y, Math.max(1, x1 - x0 - 2), mapY(0) - y)
-        })
-      } else if (chart === "box" && statistics) {
-        const [minimum, maximum] = calculateNumberExtent(xValues)
-        const mapX = (value: number) =>
-          padding.left + ((value - minimum) / (maximum - minimum)) * plotWidth
-        const centerY = padding.top + plotHeight / 2
-        context.strokeStyle = foreground
-        context.lineWidth = 2
-        context.beginPath()
-        context.moveTo(mapX(statistics.min), centerY)
-        context.lineTo(mapX(statistics.q1), centerY)
-        context.moveTo(mapX(statistics.q3), centerY)
-        context.lineTo(mapX(statistics.max), centerY)
-        context.stroke()
-        context.fillStyle = `${primary}33`
-        context.fillRect(
-          mapX(statistics.q1),
-          centerY - 42,
-          mapX(statistics.q3) - mapX(statistics.q1),
-          84
-        )
-        context.strokeStyle = primary
-        context.strokeRect(
-          mapX(statistics.q1),
-          centerY - 42,
-          mapX(statistics.q3) - mapX(statistics.q1),
-          84
-        )
-        for (const value of [statistics.min, statistics.median, statistics.max]) {
-          context.beginPath()
-          context.moveTo(mapX(value), centerY - 48)
-          context.lineTo(mapX(value), centerY + 48)
-          context.stroke()
-          context.fillStyle = muted
-          context.fillText(formatNumber(value), mapX(value) - 10, centerY + 68)
-        }
-      } else if (chart === "dot" && xValues.length > 0) {
-        const [minimum, maximum] = calculateNumberExtent(xValues)
-        const frequencies = new Map<number, number>()
-        for (const value of xValues) {
-          frequencies.set(value, (frequencies.get(value) ?? 0) + 1)
-        }
-        const maxFrequency = Math.max(...frequencies.values())
-        const { mapX, mapY } = drawAxes([minimum, maximum], [0, maxFrequency + 1])
-        context.fillStyle = primary
-        for (const [value, count] of frequencies) {
-          for (let index = 1; index <= count; index += 1) {
-            context.beginPath()
-            context.arc(mapX(value), mapY(index), 5, 0, Math.PI * 2)
-            context.fill()
-          }
-        }
-      } else {
-        const yPlotValues =
-          chart === "residual" && regression.ok ? regression.residuals : pairedValues.y
-        const [xmin, xmax] = calculateNumberExtent(pairedValues.x)
-        const [ymin, ymax] = calculateNumberExtent(yPlotValues)
-        const { mapX, mapY } = drawAxes([xmin, xmax], [ymin, ymax])
-        if (chart === "residual") {
-          context.strokeStyle = muted
-          context.setLineDash([5, 4])
-          context.beginPath()
-          context.moveTo(mapX(xmin), mapY(0))
-          context.lineTo(mapX(xmax), mapY(0))
-          context.stroke()
-          context.setLineDash([])
-        } else if (regression.ok) {
-          context.strokeStyle = secondary
-          context.lineWidth = 2
-          context.beginPath()
-          for (let index = 0; index <= 240; index += 1) {
-            const x = xmin + (index / 240) * (xmax - xmin)
-            const y = regression.predict(x)
-            if (!Number.isFinite(y)) continue
-            if (index === 0) context.moveTo(mapX(x), mapY(y))
-            else context.lineTo(mapX(x), mapY(y))
-          }
-          context.stroke()
-        }
-
-        context.fillStyle = primary
-        pairedValues.x.forEach((x, index) => {
-          const y =
-            chart === "residual" && regression.ok
-              ? regression.residuals[index]
-              : pairedValues.y[index]
-          if (!Number.isFinite(y)) return
-          context.beginPath()
-          context.arc(mapX(x), mapY(y), 4.5, 0, Math.PI * 2)
-          context.fill()
-        })
-      }
-    }
-
-    draw()
-    const observer = new ResizeObserver(draw)
-    observer.observe(host)
-    return () => observer.disconnect()
-  }, [chart, colorScheme, formatNumber, pairedValues, regression, statistics, xValues])
+  useStatisticsChart({
+    canvasRef,
+    canvasHostRef,
+    chart,
+    colorScheme,
+    formatNumber,
+    pairedValues,
+    regression,
+    statistics,
+    xValues,
+  })
 
   const statRows = statistics
     ? [
@@ -319,7 +118,7 @@ export function StatisticsMode({
 
   return (
     <div className="mirai-statistics-layout grid min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)] overflow-hidden @max-[699px]:grid-cols-1 @max-[699px]:overflow-y-auto">
-      <aside className="mirai-statistics-sidebar min-h-0 border-r bg-muted/25 @max-[699px]:min-h-[420px] @max-[699px]:border-r-0 @max-[699px]:border-b">
+      <aside className="mirai-statistics-sidebar min-h-0 border-r bg-muted/25 @max-[699px]:min-h-105 @max-[699px]:border-r-0 @max-[699px]:border-b">
         <ScrollArea className="h-full">
           <div className="space-y-5 p-5">
             <div>
@@ -328,18 +127,26 @@ export function StatisticsMode({
                 Separate values with commas, spaces, or new lines.
               </p>
             </div>
-            <label className="block space-y-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="mirai-statistics-x-values"
+              className="block space-y-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               X values
               <Textarea
+                id="mirai-statistics-x-values"
                 value={xSource}
                 onChange={(event) => setXSource(event.target.value)}
                 aria-label="X values"
                 className="min-h-24 resize-y bg-background font-mono text-sm text-foreground normal-case tracking-normal placeholder:text-muted-foreground"
               />
             </label>
-            <label className="block space-y-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="mirai-statistics-y-values"
+              className="block space-y-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               Y values
               <Textarea
+                id="mirai-statistics-y-values"
                 value={ySource}
                 onChange={(event) => setYSource(event.target.value)}
                 aria-label="Y values"
@@ -351,7 +158,7 @@ export function StatisticsMode({
                 Chart
               </h3>
               <div className="flex flex-wrap gap-2">
-                {CHARTS.map((item) => (
+                {STATISTICS_CHART_OPTIONS.map((item) => (
                   <Button
                     key={item.value}
                     size="sm"
@@ -368,7 +175,7 @@ export function StatisticsMode({
                 Regression model
               </h3>
               <div className="flex flex-wrap gap-2">
-                {MODELS.map((item) => (
+                {STATISTICS_REGRESSION_OPTIONS.map((item) => (
                   <Button
                     key={item.value}
                     size="sm"
@@ -429,12 +236,10 @@ export function StatisticsMode({
                   Residuals
                 </h3>
                 <div className="space-y-1">
-                  {regression.residuals.slice(0, 12).map((residual, index) => (
-                    <div key={index} className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        x = {formatNumber(pairedValues.x[index])}
-                      </span>
-                      <span className="font-mono">{formatNumber(residual)}</span>
+                  {residualRows.map((row) => (
+                    <div key={row.key} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">x = {formatNumber(row.x)}</span>
+                      <span className="font-mono">{formatNumber(row.residual)}</span>
                     </div>
                   ))}
                 </div>
@@ -447,7 +252,7 @@ export function StatisticsMode({
       <section className="mirai-statistics-results grid min-h-0 grid-rows-[minmax(300px,1fr)_auto] @max-[699px]:min-h-max @max-[699px]:grid-rows-[minmax(260px,1fr)_auto]">
         <div
           ref={canvasHostRef}
-          className="mirai-statistics-chart relative min-h-[300px] @max-[699px]:min-h-[260px]"
+          className="mirai-statistics-chart relative min-h-75 @max-[699px]:min-h-65"
         >
           <canvas
             ref={canvasRef}
@@ -460,11 +265,11 @@ export function StatisticsMode({
             ) : (
               <LineChart className="size-3" />
             )}
-            {CHARTS.find((item) => item.value === chart)?.label}
+            {STATISTICS_CHART_OPTIONS.find((item) => item.value === chart)?.label}
           </Badge>
         </div>
 
-        <div className="mirai-statistics-summary max-h-[310px] overflow-auto overscroll-contain border-t bg-muted/25 p-4 @max-[699px]:max-h-none @max-[699px]:overflow-visible">
+        <div className="mirai-statistics-summary max-h-77.5 overflow-auto overscroll-contain border-t bg-muted/25 p-4 @max-[699px]:max-h-none @max-[699px]:overflow-visible">
           <div className="mb-3">
             <div>
               <h3 className="text-sm font-semibold">One-variable statistics · x list</h3>
@@ -475,7 +280,7 @@ export function StatisticsMode({
             {statRows.map(([label, value]) => (
               <Card key={String(label)} className="min-w-0 gap-1 overflow-hidden py-3">
                 <CardContent className="min-w-0 px-3">
-                  <div className="min-h-4 break-words text-xs leading-4 text-muted-foreground">
+                  <div className="min-h-4 wrap-break-word text-xs leading-4 text-muted-foreground">
                     {label}
                   </div>
                   <div

@@ -204,15 +204,12 @@ Install version `0.2.0` of the dependency-free core package:
 pnpm add @openmirai/calculator-core@0.2.0
 ```
 
-Import from the root export when several calculator domains are needed:
+Import each calculator domain directly so bundlers and readers only resolve the APIs in use:
 
 ```ts
-import {
-  calculatePercent,
-  calculateStatistics,
-  evaluateExpression,
-  fitRegression,
-} from "@openmirai/calculator-core"
+import { evaluateExpression } from "@openmirai/calculator-core/engine"
+import { calculateStatistics, fitRegression } from "@openmirai/calculator-core/statistics"
+import { calculatePercent } from "@openmirai/calculator-core/tools"
 
 const value = evaluateExpression("sin(30) + sqrt(81)", {
   angleMode: "degrees",
@@ -223,15 +220,19 @@ const percent = calculatePercent(15, 240)
 const regression = fitRegression([1, 2, 3], [3, 5, 7], "linear")
 ```
 
-The package provides focused exports for narrower imports:
+The package provides focused module exports and no aggregate barrel:
 
-| Export                                  | APIs                                                        |
-| --------------------------------------- | ----------------------------------------------------------- |
-| `@openmirai/calculator-core`            | All public headless APIs                                    |
-| `@openmirai/calculator-core/engine`     | Expression evaluation, formatting, and calculator engine    |
-| `@openmirai/calculator-core/graphing`   | Expression compilation, roots, extrema, and intersections   |
-| `@openmirai/calculator-core/statistics` | Descriptive statistics, correlation, covariance, regression |
-| `@openmirai/calculator-core/tools`      | Percent, ratio, coordinate, and shape calculations          |
+| Export                                       | APIs                                                        |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| `@openmirai/calculator-core`                 | Alias of the expression engine export                       |
+| `@openmirai/calculator-core/engine`          | Expression evaluation, formatting, and calculator engine    |
+| `@openmirai/calculator-core/configuration`   | Calculator modes, display settings, and normalization       |
+| `@openmirai/calculator-core/graphing`        | Expression compilation, roots, extrema, and intersections   |
+| `@openmirai/calculator-core/graphing-data`   | Headless graphing initial-data contracts                    |
+| `@openmirai/calculator-core/graphing-view`   | Viewport projection, pan, zoom, and point projection        |
+| `@openmirai/calculator-core/statistics`      | Descriptive statistics, correlation, covariance, regression |
+| `@openmirai/calculator-core/statistics-data` | List parsing, pairing, bins, frequencies, and sampling      |
+| `@openmirai/calculator-core/tools`           | Percent, ratio, coordinate, and shape calculations          |
 
 All exports include TypeScript declarations.
 

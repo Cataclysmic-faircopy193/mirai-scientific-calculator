@@ -13,3 +13,5 @@ apps/web/src/components/mirai-calculator/*
 .DS_Store
 *.local
 *.tgz
+.tokensave/
+.omc/

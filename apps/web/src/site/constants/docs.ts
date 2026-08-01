@@ -4,7 +4,7 @@ export const DOCS_NAVIGATION = [
 ] as const
 
 export const INSTALLATION_NOTES = [
-  "Copies the calculator, all four modes, and calculator-scoped styles.",
+  "Copies the calculator and all four Tailwind-styled mode modules.",
   "Adds the lightweight @openmirai/calculator-core package automatically.",
   "Uses your project’s configured shadcn style, including Base UI and Radix.",
   "Preserves host theme tokens and unrelated components.",
@@ -12,10 +12,8 @@ export const INSTALLATION_NOTES = [
 
 export const INSTALL_COMMAND = "pnpm dlx shadcn@latest add @openmirai/calculator"
 
-export const INSTALLATION_EXAMPLE = `import {
-  CalculatorExtension,
-  MiraiCalculator,
-} from "@/components/mirai-calculator/mirai-calculator"
+export const INSTALLATION_EXAMPLE = `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 
 /** Supplies the static installation example used by the documentation code block. */
 export function CalculatorWorkspace() {

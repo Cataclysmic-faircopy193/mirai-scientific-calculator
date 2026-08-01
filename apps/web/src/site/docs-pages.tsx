@@ -29,7 +29,7 @@ export function DocsLayout() {
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:px-8 lg:grid-cols-[200px_minmax(0,1fr)] lg:px-10">
       <aside className="lg:sticky lg:top-24 lg:h-fit">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Documentation
         </p>
         <nav className="mt-4 grid gap-1" aria-label="Documentation">

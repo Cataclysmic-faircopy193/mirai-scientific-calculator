@@ -2,11 +2,9 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
-import {
-  CalculatorExtension,
-  MiraiCalculator,
-  type CalculatorExtension as CalculatorExtensionType,
-} from "@/components/mirai-calculator/mirai-calculator"
+import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
+import type { CalculatorExtension as CalculatorExtensionType } from "@openmirai/calculator-core/configuration"
 
 describe("MiraiCalculator extensions", () => {
   it("exports enum-like uppercase keys with URL-friendly values", () => {
@@ -35,7 +33,7 @@ describe("MiraiCalculator extensions", () => {
       "unsupported",
       CalculatorExtension.TOOLS,
       CalculatorExtension.SCIENTIFIC,
-    ] as unknown as readonly CalculatorExtensionType[]
+    ] as unknown as ReadonlyArray<CalculatorExtensionType>
 
     render(
       <MiraiCalculator
@@ -127,6 +125,42 @@ describe("MiraiCalculator extensions", () => {
     await user.click(screen.getByRole("button", { name: "Analysis" }))
     expect(screen.getByText("Analysis", { selector: "h3" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Hide analysis" })).toBeInTheDocument()
+  })
+
+  it("lets graphing empty-state Add actions create the missing content", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator extensions={[CalculatorExtension.GRAPHING]} />)
+
+    await user.click(screen.getByRole("button", { name: "Add expression" }))
+    expect(screen.getByRole("textbox", { name: "Graph expression 1" })).toHaveValue("")
+
+    await user.click(screen.getByRole("button", { name: "Add table row" }))
+    expect(screen.getByRole("textbox", { name: "x₁ row 1" })).toHaveValue("")
+    expect(screen.getByRole("textbox", { name: "y₁ row 1" })).toHaveValue("")
+  })
+
+  it("lets the scientific empty-state Add action create a definition", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator extensions={[CalculatorExtension.SCIENTIFIC]} />)
+
+    await user.click(screen.getByRole("button", { name: "Add definition" }))
+
+    expect(screen.getByRole("textbox", { name: "Definition 1" })).toHaveValue("")
+  })
+
+  it("keeps definition rows aligned when an earlier definition is removed", async () => {
+    const user = userEvent.setup()
+    render(
+      <MiraiCalculator
+        extensions={[CalculatorExtension.SCIENTIFIC]}
+        defaultDefinitions={["a = 1", "b = 2"]}
+      />
+    )
+
+    await user.click(screen.getByRole("button", { name: "Remove definition 1" }))
+
+    expect(screen.getByRole("textbox", { name: "Definition 1" })).toHaveValue("b = 2")
+    expect(screen.queryByRole("textbox", { name: "Definition 2" })).not.toBeInTheDocument()
   })
 
   it("shows angle and graph controls only for extensions that use them", async () => {

@@ -1,5 +1,5 @@
 import type { NumberFormatOptions } from "./calculator-engine"
-import type { GraphView } from "./graphing"
+import type { GraphView } from "./graphing-view"
 
 /** Identifies an installable calculator workspace. */
 export const CalculatorExtension = {
@@ -26,40 +26,6 @@ export interface CalculatorDisplaySettings {
   thousandsSeparator: boolean
 }
 
-/** Supported decimal-place options for calculator settings controls. */
-export const DECIMAL_OPTIONS = [0, 1, 2, 3, 4, 6] as const
-
-/** Graph viewport properties that can be edited as numeric boundaries. */
-export const GRAPH_BOUNDARY_KEYS = ["xmin", "xmax", "ymin", "ymax"] as const
-
-/** Human-readable angle-mode labels. */
-export const ANGLE_MODE_LABELS = {
-  degrees: "Degrees",
-  radians: "Radians",
-} as const
-
-/** Human-readable number-notation labels. */
-export const NOTATION_LABELS = {
-  auto: "Automatic",
-  scientific: "Scientific",
-} as const
-
-/** Human-readable calculator theme labels. */
-export const THEME_LABELS = {
-  dark: "Dark",
-  light: "Light",
-  system: "System",
-} as const
-
-/** Semantic shadcn chart tokens used by calculator visualizations. */
-export const CALCULATOR_CHART_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-] as const
-
 /** Default result formatting used when the host does not provide settings UI. */
 export const DEFAULT_DISPLAY_SETTINGS: Readonly<CalculatorDisplaySettings> = {
   notation: "auto",
@@ -77,19 +43,21 @@ export const DEFAULT_GRAPH_VIEW: Readonly<GraphView> = {
 }
 
 /** Empty reusable-definition collection for headless calculator defaults. */
-export const EMPTY_CALCULATOR_DEFINITIONS: readonly string[] = []
+export const EMPTY_CALCULATOR_DEFINITIONS: ReadonlyArray<string> = []
 
 /** Returns the supported extensions in their canonical display order. */
-export function calculatorExtensions(): CalculatorExtension[] {
+export function calculatorExtensions(): Array<CalculatorExtension> {
   return Object.values(CalculatorExtension)
 }
 
 /** Removes unsupported and duplicate extension values while preserving canonical input order. */
 export function normalizeCalculatorExtensions(
-  extensions: readonly CalculatorExtension[] | undefined
-): CalculatorExtension[] {
+  extensions: ReadonlyArray<CalculatorExtension> | undefined
+): Array<CalculatorExtension> {
   const supported = calculatorExtensions()
-  if (extensions === undefined || !Array.isArray(extensions)) return supported
+  if (extensions === undefined || !Array.isArray(extensions)) {
+    return supported
+  }
 
   const supportedExtensions = new Set<unknown>(supported)
   return [...new Set(extensions.filter((extension) => supportedExtensions.has(extension)))]
@@ -109,24 +77,15 @@ export function calculatorNumberFormatOptions(
 
 /** Collects single-letter calculator variables from slider-backed expressions. */
 export function collectSliderVariables(
-  entries: readonly { expression: string; value: number | undefined }[]
+  entries: ReadonlyArray<{ expression: string; value: number | undefined }>
 ): Record<string, number> {
   return Object.fromEntries(
     entries.flatMap(({ expression, value }) => {
-      if (value === undefined) return []
+      if (value === undefined) {
+        return []
+      }
       const name = expression.split("=")[0]?.trim().toLowerCase()
       return /^[a-z]$/.test(name) ? [[name, value]] : []
     })
   )
-}
-
-/** Resolves a CSS custom-property token to a canvas-compatible color. */
-export function resolveCssColorToken(
-  token: string,
-  customProperties: Readonly<Record<string, string>>,
-  fallback: string
-): string {
-  const match = /^var\((--[^)]+)\)$/.exec(token.trim())
-  if (!match) return token || fallback
-  return customProperties[match[1]]?.trim() || fallback
 }

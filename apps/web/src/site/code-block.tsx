@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { CODE_LANGUAGE_LABELS, type CodeLanguage } from "@/site/constants/code"
+import { CODE_LANGUAGE_LABELS } from "@/site/constants/code"
+import type { CodeLanguage } from "@/site/constants/code"
 import { CopyButton } from "@/site/copy-button"
 import { HighlightedCode } from "@/site/highlighted-code"
 
@@ -20,7 +21,7 @@ export function CodeBlock({
       className="gap-0 overflow-hidden py-0"
     >
       <CardHeader className="flex min-h-11 flex-row items-center justify-between border-b bg-muted/40 px-4 py-2">
-        <span className="font-mono text-[11px] text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground">
           {label} · {CODE_LANGUAGE_LABELS[language]}
         </span>
         <CopyButton value={code} label="Copy" />

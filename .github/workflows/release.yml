@@ -45,3 +45,9 @@ jobs:
 
       - name: Release existing package version
         run: pnpm exec release-it --ci --no-increment
+
+  deploy-site:
+    name: Deploy tagged site to Cloudflare
+    needs: release
+    uses: ./.github/workflows/cloudflare-deploy.yml
+    secrets: inherit

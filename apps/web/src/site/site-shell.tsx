@@ -79,7 +79,7 @@ function ShellContent() {
             >
               <Search />
               <span>Search...</span>
-              <kbd className="ml-auto rounded border bg-muted px-1.5 font-mono text-[10px]">⌘K</kbd>
+              <kbd className="ml-auto rounded border bg-muted px-1.5 font-mono text-xs">⌘K</kbd>
             </Button>
             <Button
               variant="ghost"

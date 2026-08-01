@@ -15,7 +15,9 @@ const requiredFiles = [
 for (const file of requiredFiles) {
   try {
     const details = await stat(file)
-    if (!details.isFile()) throw new Error("not a file")
+    if (!details.isFile()) {
+      throw new Error("not a file")
+    }
   } catch {
     throw new Error(`Required site input is missing: ${path.relative(rootDirectory, file)}`)
   }
@@ -51,6 +53,4 @@ const headersText = `/*
   Cache-Control: public, max-age=300, s-maxage=900
 `
 
-await Promise.all([writeFile(path.join(siteDirectory, "_headers"), headersText)])
-
-console.log(`Prepared static site assets in ${path.relative(rootDirectory, siteDirectory)}`)
+await writeFile(path.join(siteDirectory, "_headers"), headersText)

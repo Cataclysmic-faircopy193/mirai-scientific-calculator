@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import { CalculatorEngine, evaluateExpression, factorial } from "../calculator-engine"
+import {
+  CalculatorEngine,
+  completeExpression,
+  evaluateExpression,
+  factorial,
+  formatExpressionInput,
+} from "../calculator-engine"
 
 describe("CalculatorEngine", () => {
   it("evaluates arithmetic, unicode operators, and implicit multiplication", () => {
@@ -11,6 +17,42 @@ describe("CalculatorEngine", () => {
     expect(engine.evaluate("2(3+4)")).toBe(14)
     expect(engine.evaluate("√(81) + ∛(27)")).toBe(12)
     expect(engine.evaluate("−3^2")).toBe(-9)
+  })
+
+  it("completes omitted closing parentheses at an explicit evaluation boundary", () => {
+    const engine = new CalculatorEngine()
+
+    expect(completeExpression("sqrt(2")).toBe("sqrt(2)")
+    expect(completeExpression("2×(3+(4")).toBe("2×(3+(4))")
+    expect(completeExpression("2+3)")).toBe("2+3)")
+    expect(completeExpression("")).toBe("")
+    expect(completeExpression("((1)+2")).toBe("((1)+2)")
+    expect(completeExpression("(1))+(")).toBe("(1))+(")
+    expect(engine.evaluate(completeExpression("sqrt(2"))).toBeCloseTo(Math.SQRT2)
+  })
+
+  it("formats keyboard aliases as calculator notation without changing their value", () => {
+    const engine = new CalculatorEngine()
+
+    expect(formatExpressionInput("x^2")).toBe("x²")
+    expect(formatExpressionInput("sqrt(2^10*pi-1")).toBe("√(2¹⁰×π−1")
+    expect(formatExpressionInput("cbrt(8)>=2")).toBe("∛(8)≥2")
+    expect(formatExpressionInput("2²3")).toBe("2²³")
+    expect(formatExpressionInput("x^−2")).toBe("x⁻²")
+    expect(formatExpressionInput("x^-12")).toBe("x⁻¹²")
+    expect(formatExpressionInput("x^001")).toBe("x⁰⁰¹")
+    expect(formatExpressionInput("x¹²34")).toBe("x¹²³⁴")
+    expect(formatExpressionInput("x^2.5")).toBe("x^2.5")
+    expect(formatExpressionInput("x².")).toBe("x^2.")
+    expect(formatExpressionInput("x⁻².")).toBe("x^−2.")
+    expect(formatExpressionInput("SqRt(4)+CBRT(8)+PI")).toBe("√(4)+∛(8)+π")
+    expect(formatExpressionInput("1<=2 != 3>=2")).toBe("1≤2 ≠ 3≥2")
+    expect(formatExpressionInput("2*3/4-5")).toBe("2×3÷4−5")
+    const formatted = formatExpressionInput("sqrt(2^10*pi-1")
+    expect(formatExpressionInput(formatted)).toBe(formatted)
+    expect(engine.evaluate(formatExpressionInput("2^10"))).toBe(1024)
+    expect(engine.evaluate(formatExpressionInput("2^-3"))).toBe(0.125)
+    expect(engine.evaluate(completeExpression(formatExpressionInput("sqrt(9")))).toBe(3)
   })
 
   it("supports degrees and radians", () => {
@@ -68,6 +110,17 @@ describe("CalculatorEngine", () => {
         significantFigures: 4,
       })
     ).toBe("1.2 × 10^3")
+    expect(engine.format(true)).toBe("true")
+    expect(engine.format(false)).toBe("false")
+    expect(engine.format([1, 2, 3])).toBe("[1, 2, 3]")
+    expect(engine.format(Array.from({ length: 13 }, (_, index) => index))).toMatch(/, …\]$/)
+    expect(engine.format(Number.NaN)).toBe("—")
+    expect(engine.format(0)).toBe("0")
+    expect(engine.format(1234.5, { thousandsSeparator: false })).toBe("1234.5")
+    expect(engine.toFraction(4)).toBe("4")
+    expect(engine.toFraction(-0.5)).toBe("-1/2")
+    expect(engine.toFraction(Number.NaN)).toBeNull()
+    expect(engine.toFraction(Math.PI, 10)).toBeNull()
   })
 
   it("rounds decimal ties consistently away from zero", () => {
@@ -126,12 +179,21 @@ describe("CalculatorEngine", () => {
     expect(cache.size).toBeLessThanOrEqual(256)
     expect(() => engine.setAns(Number.NaN)).toThrow(/finite/i)
     expect(() => engine.setVariables({ x: Number.POSITIVE_INFINITY })).toThrow(/finite/i)
+    expect(() => engine.setAngleMode("gradians" as "degrees")).toThrow(/angle mode/i)
+    expect(() => engine.setVariables({ speed: 1 })).toThrow(/single letters/i)
+    expect(() => engine.evaluate("x", { speed: 1 })).toThrow(/single letters/i)
+    expect(() =>
+      engine.setVariables(
+        Object.fromEntries(Array.from({ length: 129 }, (_, index) => [`v${index}`, index]))
+      )
+    ).toThrow(/too many/i)
     expect(
       () =>
         new CalculatorEngine({
           definitions: Array.from({ length: 129 }, (_, index) => `a=${index}`),
         })
     ).toThrow(/too many definitions/i)
+    expect(() => engine.setDefinitions([`a=${"1".repeat(4097)}`])).toThrow(/too long/i)
   })
 
   it("exposes a one-shot evaluate helper", () => {
@@ -248,6 +310,32 @@ describe("CalculatorEngine", () => {
     expect(engine.evaluate("sort([3,1,2])")).toEqual([1, 2, 3])
     expect(engine.evaluate("corr([1,2,3],[2,4,6])")).toBeCloseTo(1)
     expect(engine.evaluate("cov([1,2,3],[2,4,6])")).toBeCloseTo(2)
+    expect(engine.evaluate("abs([−1,2,−3])")).toEqual([1, 2, 3])
+    expect(engine.evaluate("logb([2,10],[8,100])")).toEqual([3, 2])
+  })
+
+  it("rejects invalid scalar and list combinations", () => {
+    expect(() => evaluateExpression("sin(1<2)")).toThrow(/numeric value/i)
+    expect(() => evaluateExpression("[1,2]<[2,3]")).toThrow(/boolean list/i)
+    expect(() => evaluateExpression("abs([1,infinity])")).toThrow(/finite|numeric range/i)
+    expect(() => evaluateExpression("logb([2,3],[8])")).toThrow(/same length/i)
+    expect(() => evaluateExpression("corr(1,2)")).toThrow(/two lists/i)
+    expect(() => evaluateExpression("quantile(1,0.5)")).toThrow(/list and a percentile/i)
+    expect(() => evaluateExpression("quantile([],0.5)")).toThrow(/not enough data/i)
+    expect(() => evaluateExpression("quartile([1,2,3])")).not.toThrow()
+    expect(evaluateExpression("quartile(1,2,3,4)")).toBe(1.75)
+    expect(() => evaluateExpression("quartile([1,2],2,[3,4])")).toThrow(/one list/i)
+    expect(() => evaluateExpression("sum([])")).toThrow(/not enough data/i)
+  })
+
+  it("uses definition caches and ignores malformed definitions", () => {
+    const engine = new CalculatorEngine({
+      definitions: ["ignored", "a = 5", "also ignored = 9"],
+      variables: { x: 2 },
+    })
+
+    expect(engine.evaluate("a+a+x")).toBe(12)
+    expect(engine.evaluate("pi")).toBeCloseTo(Math.PI)
   })
 
   it("supports comparisons, piecewise expressions, and exact function arity", () => {
@@ -276,6 +364,7 @@ describe("CalculatorEngine", () => {
     ["5!!", /repeated factorial/i],
     ["50%%", /repeated percent/i],
     ["sqrt()", /needs 1 value/i],
+    ["sin(infinity)", /finite|numeric range/i],
     ["sin(1,2)", /needs 1 value/i],
     ["round(1,2,3)", /needs 1 or 2 values/i],
     ["round(1,1.5)", /precision must be a whole number/i],
@@ -289,12 +378,16 @@ describe("CalculatorEngine", () => {
     ["nthroot(2,−4)", /not a real number/i],
     ["nthroot(0,4)", /degree cannot be zero/i],
     ["log(0)", /positive value/i],
+    ["ln(0)", /positive value/i],
     ["logb(1,10)", /base or value/i],
     ["tan(90)", /tangent is not defined/i],
     ["sec(90)", /secant is not defined/i],
     ["csc(0)", /cosecant is not defined/i],
     ["cot(0)", /cotangent is not defined/i],
     ["asin(2)", /not a real number/i],
+    ["acos(2)", /not a real number/i],
+    ["asec(0.5)", /not a real number/i],
+    ["acsc(0.5)", /not a real number/i],
     ["(−1)!", /non-negative whole number/i],
     ["2.5!", /non-negative whole number/i],
     ["171!", /too large/i],

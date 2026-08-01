@@ -10,8 +10,8 @@ import {
   calculateShapes,
   parseToolNumber,
   serializeToolValue,
-  type ToolsInitialData,
 } from "@openmirai/calculator-core/tools"
+import type { ToolsInitialData } from "@openmirai/calculator-core/tools"
 
 export interface ToolsModeProps {
   formatNumber: (value: number) => string
@@ -22,7 +22,7 @@ function ResultRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="mirai-tools-result flex items-center justify-between gap-4 text-sm @max-[699px]:flex-col @max-[699px]:items-start @max-[699px]:gap-0.5">
       <span className="text-muted-foreground">{label}</span>
-      <strong className="min-w-0 max-w-full text-right font-mono break-words @max-[699px]:text-left">
+      <strong className="min-w-0 max-w-full text-right font-mono wrap-break-word @max-[699px]:text-left">
         {value}
       </strong>
     </div>
@@ -93,6 +93,19 @@ export function ToolsMode({ formatNumber: formatValue, defaultData }: ToolsModeP
       ),
     [x1, x2, y1, y2]
   )
+  let lineThroughPoints: string
+  switch (coordinateResults.slope) {
+    case null:
+      lineThroughPoints = `x = ${formatNumber(parseToolNumber(x1))}`
+      break
+    default: {
+      const intercept = coordinateResults.intercept
+      lineThroughPoints =
+        intercept === null
+          ? "undefined"
+          : `y = ${formatNumber(coordinateResults.slope)}x ${intercept < 0 ? "−" : "+"} ${formatNumber(Math.abs(intercept))}`
+    }
+  }
   const shapeResults = useMemo(
     () =>
       calculateShapes(
@@ -195,19 +208,12 @@ export function ToolsMode({ formatNumber: formatValue, defaultData }: ToolsModeP
                     : formatNumber(coordinateResults.slope)
                 }
               />
-              <ResultRow
-                label="Line through points"
-                value={
-                  coordinateResults.slope === null
-                    ? `x = ${formatNumber(parseToolNumber(x1))}`
-                    : `y = ${formatNumber(coordinateResults.slope)}x ${coordinateResults.intercept! < 0 ? "−" : "+"} ${formatNumber(Math.abs(coordinateResults.intercept!))}`
-                }
-              />
+              <ResultRow label="Line through points" value={lineThroughPoints} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="mirai-tools-wide col-[1/-1]">
+        <Card className="mirai-tools-wide col-span-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DraftingCompass className="size-4 text-primary" />
@@ -246,7 +252,7 @@ export function ToolsMode({ formatNumber: formatValue, defaultData }: ToolsModeP
           </CardContent>
         </Card>
 
-        <Card className="mirai-tools-wide col-[1/-1] border-primary/20 bg-primary/5">
+        <Card className="mirai-tools-wide col-span-full border-primary/20 bg-primary/5">
           <CardContent className="py-4">
             <p className="text-sm font-medium text-primary">Practice tip</p>
             <p className="mt-1 text-sm text-muted-foreground">

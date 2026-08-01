@@ -1,9 +1,8 @@
-import { BarChart3, Calculator, CirclePercent, LineChart, type LucideIcon } from "lucide-react"
+import { BarChart3, Calculator, CirclePercent, LineChart } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
-import {
-  CalculatorExtension,
-  type CalculatorExtension as CalculatorExtensionValue,
-} from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
+import type { CalculatorExtension as CalculatorExtensionValue } from "@openmirai/calculator-core/configuration"
 
 export interface ExtensionDetail {
   id: CalculatorExtensionValue
@@ -12,11 +11,11 @@ export interface ExtensionDetail {
   summary: string
   description: string
   icon: LucideIcon
-  features: readonly string[]
+  features: ReadonlyArray<string>
   example: string
 }
 
-export const EXTENSIONS: readonly ExtensionDetail[] = [
+export const EXTENSIONS: ReadonlyArray<ExtensionDetail> = [
   {
     id: CalculatorExtension.SCIENTIFIC,
     label: "Scientific",
@@ -31,10 +30,8 @@ export const EXTENSIONS: readonly ExtensionDetail[] = [
       "History, answer memory, undo, and redo",
       "Fractions, roots, powers, logs, and trigonometry",
     ],
-    example: `import {
-  CalculatorExtension,
-  MiraiCalculator,
-} from "@/components/mirai-calculator/mirai-calculator"
+    example: `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 
 export function ScientificCalculator() {
   return (
@@ -59,10 +56,8 @@ export function ScientificCalculator() {
       "Pan, zoom, grid, and curve tracing",
       "Sliders, tables, and regression summaries",
     ],
-    example: `import {
-  CalculatorExtension,
-  MiraiCalculator,
-} from "@/components/mirai-calculator/mirai-calculator"
+    example: `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 
 export function GraphingCalculator() {
   return (
@@ -87,10 +82,8 @@ export function GraphingCalculator() {
       "Correlation and covariance",
       "Six regression models with residuals",
     ],
-    example: `import {
-  CalculatorExtension,
-  MiraiCalculator,
-} from "@/components/mirai-calculator/mirai-calculator"
+    example: `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 
 export function StatisticsCalculator() {
   return (
@@ -115,10 +108,8 @@ export function StatisticsCalculator() {
       "Distance, midpoint, and slope",
       "Circle, triangle, and prism measures",
     ],
-    example: `import {
-  CalculatorExtension,
-  MiraiCalculator,
-} from "@/components/mirai-calculator/mirai-calculator"
+    example: `import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 
 export function MathToolsCalculator() {
   return (
@@ -145,7 +136,7 @@ export interface SiteRouteItem {
   keywords: string
 }
 
-export const SITE_ROUTES: readonly SiteRouteItem[] = [
+export const SITE_ROUTES: ReadonlyArray<SiteRouteItem> = [
   { path: "/", label: "Overview", section: "Explore", keywords: "home showcase calculator" },
   {
     path: "/playground",

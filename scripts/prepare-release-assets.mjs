@@ -57,5 +57,3 @@ await writeFile(
     2
   )}\n`
 )
-
-console.log(`Prepared release assets for ${packageJson.name}@${packageJson.version}.`)

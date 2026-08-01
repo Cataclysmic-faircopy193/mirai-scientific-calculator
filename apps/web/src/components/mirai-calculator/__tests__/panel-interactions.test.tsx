@@ -14,11 +14,11 @@ describe("MiraiCalculator panel interactions", () => {
     const tabList = screen.getByRole("tablist")
 
     expect(basic).toHaveAttribute("aria-selected", "true")
-    expect(tabList).toHaveClass("h-10!", "overflow-hidden")
+    expect(tabList).toHaveClass("h-10!", "overflow-x-auto", "overflow-y-hidden")
     expect(basic).toHaveClass("data-active:text-primary", "after:bg-primary!")
     expect(screen.getByRole("button", { name: "7" })).toHaveClass(
       "mirai-scientific-key",
-      "data-[key-label-size=single]:text-[clamp(0.875rem,5cqi,1.0625rem)]"
+      "data-[key-label-size=single]:text-lg"
     )
 
     await user.click(functions)
@@ -33,7 +33,7 @@ describe("MiraiCalculator panel interactions", () => {
 
   it("delegates inline sizing and resizing to its host page", () => {
     const { container } = render(
-      <div className="h-[640px] w-[900px] resize overflow-hidden">
+      <div className="h-160 w-225 resize overflow-hidden">
         <MiraiCalculator />
       </div>
     )
@@ -67,7 +67,9 @@ describe("MiraiCalculator panel interactions", () => {
     const { container } = render(<MiraiCalculator defaultMode="graphing" />)
     const panel = container.querySelector<HTMLElement>(".mirai-calculator")
 
-    if (!panel) throw new Error("Calculator panel did not render")
+    if (!panel) {
+      throw new Error("Calculator panel did not render")
+    }
     await user.click(screen.getByRole("button", { name: "Calculator settings" }))
 
     const dialog = screen.getByRole("dialog", { name: "Calculator settings" })
@@ -111,7 +113,7 @@ describe("MiraiCalculator panel interactions", () => {
     const listbox = await screen.findByRole("listbox")
     const portal = listbox.closest<HTMLElement>("[data-slot='select-content']")
 
-    expect(portal).toHaveClass("dark", "z-[2147483002]")
+    expect(portal).toHaveClass("dark", "z-2147483002")
     expect(portal).toHaveAttribute("data-theme", "dark")
     expect(portal?.style.getPropertyValue("--background")).toBe("")
     expect(portal?.style.getPropertyValue("--popover")).toBe("")
@@ -128,13 +130,13 @@ describe("MiraiCalculator panel interactions", () => {
       "fixed",
       "inset-3",
       "h-[calc(100dvh-1.5rem)]",
-      "z-[2147483000]"
+      "z-2147483000"
     )
     expect(fullscreenPanel?.style.height).toBe("")
     expect(document.querySelector("[data-mirai-fullscreen-guard]")).toHaveClass(
       "fixed",
       "inset-0",
-      "z-[2147482999]"
+      "z-2147482999"
     )
     expect(fullscreenPanel?.parentElement?.parentElement).toBe(document.body)
     expect(document.documentElement).toHaveStyle({ overflow: "hidden" })
@@ -162,14 +164,16 @@ describe("MiraiCalculator panel interactions", () => {
   it("contains graph wheel zoom inside the calculator", () => {
     const { container } = render(<MiraiCalculator defaultMode="graphing" />)
     const canvas = container.querySelector("canvas")
-    if (!canvas) throw new Error("Graph canvas did not render")
+    if (!canvas) {
+      throw new Error("Graph canvas did not render")
+    }
 
     const wheelEvent = new WheelEvent("wheel", {
       bubbles: true,
       cancelable: true,
       deltaY: 120,
     })
-    act(() => canvas.dispatchEvent(wheelEvent))
+    void act(() => canvas.dispatchEvent(wheelEvent))
     expect(wheelEvent.defaultPrevented).toBe(true)
   })
 
@@ -182,7 +186,9 @@ describe("MiraiCalculator panel interactions", () => {
       />
     )
     const canvas = container.querySelector("canvas")
-    if (!canvas) throw new Error("Graph canvas did not render")
+    if (!canvas) {
+      throw new Error("Graph canvas did not render")
+    }
     canvas.getBoundingClientRect = () =>
       ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400 }) as DOMRect
 
@@ -207,7 +213,9 @@ describe("MiraiCalculator panel interactions", () => {
       />
     )
     const canvas = container.querySelector("canvas")
-    if (!canvas) throw new Error("Graph canvas did not render")
+    if (!canvas) {
+      throw new Error("Graph canvas did not render")
+    }
     canvas.getBoundingClientRect = () =>
       ({ left: 0, top: 0, width: 600, height: 400, right: 600, bottom: 400 }) as DOMRect
 

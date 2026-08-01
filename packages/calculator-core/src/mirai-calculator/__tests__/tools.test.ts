@@ -13,6 +13,8 @@ describe("calculator tools", () => {
   it("parses formatted tool values with a caller-selected fallback", () => {
     expect(parseToolNumber("1,234.5")).toBe(1234.5)
     expect(parseToolNumber("not a number", 2)).toBe(2)
+    expect(parseToolNumber("")).toBe(0)
+    expect(parseToolNumber("  -1,000e-2  ")).toBe(-10)
   })
 
   it("keeps registry tool inputs empty unless the host supplies a value", () => {
@@ -27,6 +29,18 @@ describe("calculator tools", () => {
       increased: 276,
       decreased: 204,
       originalBeforeIncrease: 240 / 1.15,
+    })
+    expect(calculatePercent(-100, 240)).toMatchObject({
+      portion: -240,
+      increased: 0,
+      decreased: 480,
+      originalBeforeIncrease: Number.NaN,
+    })
+    expect(calculatePercent(0, -5)).toEqual({
+      portion: -0,
+      increased: -5,
+      decreased: -5,
+      originalBeforeIncrease: -5,
     })
   })
 
@@ -69,6 +83,41 @@ describe("calculator tools", () => {
     })
   })
 
+  it("defines zero and signed ratio edge cases", () => {
+    expect(calculateRatio(0, 5, 0)).toEqual({
+      simplifiedLeft: 0,
+      simplifiedRight: 1,
+      scaledLeft: 0,
+      scaledRight: 0,
+      decimal: 0,
+      gcd: 5,
+      lcm: 0,
+    })
+    expect(calculateRatio(5, 0, -2)).toMatchObject({
+      simplifiedLeft: 1,
+      simplifiedRight: 0,
+      scaledLeft: -10,
+      scaledRight: -0,
+      decimal: Number.NaN,
+      gcd: 5,
+      lcm: 0,
+    })
+    expect(calculateRatio(-6, 8, 1)).toMatchObject({
+      simplifiedLeft: -3,
+      simplifiedRight: 4,
+      decimal: -0.75,
+      gcd: 2,
+      lcm: 24,
+    })
+    expect(calculateRatio(0, 0, 1)).toMatchObject({
+      simplifiedLeft: 0,
+      simplifiedRight: 0,
+      decimal: Number.NaN,
+      gcd: 0,
+      lcm: 0,
+    })
+  })
+
   it("calculates coordinate geometry", () => {
     const result = calculateCoordinates(-2, 1, 4, 9)
 
@@ -90,6 +139,27 @@ describe("calculator tools", () => {
     expect(opposite.distance).toBe(Number.POSITIVE_INFINITY)
   })
 
+  it("handles vertical and horizontal coordinate pairs", () => {
+    expect(calculateCoordinates(2, -3, 2, 7)).toEqual({
+      distance: 10,
+      midpoint: [2, 2],
+      slope: null,
+      intercept: null,
+    })
+    expect(calculateCoordinates(-4, 5, 8, 5)).toEqual({
+      distance: 12,
+      midpoint: [2, 5],
+      slope: 0,
+      intercept: 5,
+    })
+    expect(calculateCoordinates(0, 0, 0, 0)).toEqual({
+      distance: 0,
+      midpoint: [0, 0],
+      slope: null,
+      intercept: null,
+    })
+  })
+
   it("calculates common shape measures", () => {
     const result = calculateShapes(5, 12, 7, 4)
 
@@ -97,6 +167,15 @@ describe("calculator tools", () => {
     expect(result.circumference).toBeCloseTo(10 * Math.PI)
     expect(result.triangleArea).toBe(42)
     expect(result.prismVolume).toBe(336)
+  })
+
+  it("preserves signed geometric dimensions without hiding invalid domain input", () => {
+    expect(calculateShapes(-2, -3, 4, -5)).toEqual({
+      circleArea: 4 * Math.PI,
+      circumference: -4 * Math.PI,
+      triangleArea: -6,
+      prismVolume: 60,
+    })
   })
 
   it("rejects non-finite helper inputs instead of returning misleading data", () => {

@@ -1,4 +1,4 @@
-function requireFinite(values: number[]): void {
+function requireFinite(values: Array<number>): void {
   if (values.some((value) => !Number.isFinite(value))) {
     throw new Error("Tool inputs must be finite numbers")
   }
@@ -145,19 +145,24 @@ export function calculateCoordinates(
   const normalizedDy = coordinateScale === 0 ? 0 : y2 / coordinateScale - y1 / coordinateScale
   const dx = x2 - x1
   const dy = y2 - y1
-  const slope =
-    normalizedDx === 0
-      ? null
-      : Number.isFinite(dx) && Number.isFinite(dy)
-        ? dy / dx
-        : normalizedDy / normalizedDx
+  let slope: number | null
+  if (normalizedDx === 0) {
+    slope = null
+  } else if (Number.isFinite(dx) && Number.isFinite(dy)) {
+    slope = dy / dx
+  } else {
+    slope = normalizedDy / normalizedDx
+  }
+  let distance: number
+  if (coordinateScale === 0) {
+    distance = 0
+  } else if (Number.isFinite(dx) && Number.isFinite(dy)) {
+    distance = Math.hypot(dx, dy)
+  } else {
+    distance = Math.hypot(normalizedDx, normalizedDy) * coordinateScale
+  }
   return {
-    distance:
-      coordinateScale === 0
-        ? 0
-        : Number.isFinite(dx) && Number.isFinite(dy)
-          ? Math.hypot(dx, dy)
-          : Math.hypot(normalizedDx, normalizedDy) * coordinateScale,
+    distance,
     midpoint: [stableMidpoint(x1, x2), stableMidpoint(y1, y2)],
     slope,
     intercept: slope === null ? null : y1 - slope * x1,

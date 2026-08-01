@@ -9,12 +9,12 @@ describe("PlaygroundCalculatorPreview", () => {
     const preview = container.querySelector<HTMLElement>("[data-playground-calculator-preview]")
     const backdrop = container.querySelector<HTMLElement>("[data-playground-backdrop]")
 
-    expect(preview).toHaveClass("h-[760px]", "overflow-hidden")
+    expect(preview).toHaveClass("h-190", "overflow-hidden")
     expect(preview).not.toHaveClass("resize")
     expect(backdrop).toHaveClass("dark", "bg-background")
     expect(backdrop).toHaveAttribute("data-theme", "dark")
     expect(screen.getByText("Practice session")).toBeInTheDocument()
-    expect(container.querySelectorAll('svg[aria-label="OpenMirai"]')).toHaveLength(2)
+    expect(container.querySelectorAll('svg[aria-label="OpenMirai"]')).toHaveLength(1)
   })
 
   it("keeps resizing on the calculator frame instead of the backdrop", () => {
@@ -22,12 +22,12 @@ describe("PlaygroundCalculatorPreview", () => {
     const preview = container.querySelector<HTMLElement>("[data-playground-calculator-preview]")
     const frame = container.querySelector<HTMLElement>("[data-playground-calculator-frame]")
 
-    expect(preview).toHaveClass("h-[700px]", "overflow-hidden")
+    expect(preview).toHaveClass("h-175", "overflow-hidden")
     expect(preview).not.toHaveClass("resize")
     expect(container.querySelector("[data-playground-surface]")).toBeInTheDocument()
     expect(container.querySelector("[data-playground-backdrop]")).not.toBeInTheDocument()
     expect(screen.queryByText("Practice session")).not.toBeInTheDocument()
-    expect(frame).toHaveClass("absolute", "max-w-[calc(100%_-_2rem)]")
+    expect(frame).toHaveClass("absolute", "max-w-[calc(100%-2rem)]")
     expect(frame).toHaveAttribute("data-min-width", "320")
     expect(frame).toHaveAttribute("data-min-height", "520")
     expect(screen.getByRole("button", { name: "Resize calculator" })).toBeInTheDocument()
@@ -69,6 +69,9 @@ describe("PlaygroundCalculatorPreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hide calculator" }))
 
     const launcher = screen.getByRole("button", { name: "Show calculator" })
+    expect(frame).toHaveStyle({ width: "48px", height: "48px" })
+    expect(screen.queryByRole("button", { name: "Resize calculator" })).not.toBeInTheDocument()
+
     fireEvent.pointerDown(launcher, { button: 0, clientX: 100, clientY: 100 })
     fireEvent.pointerMove(window, { clientX: 140, clientY: 105 })
     fireEvent.pointerUp(window)
@@ -79,6 +82,8 @@ describe("PlaygroundCalculatorPreview", () => {
 
     fireEvent.click(launcher)
     expect(screen.getByRole("button", { name: "Hide calculator" })).toBeInTheDocument()
+    expect(frame).toHaveStyle({ width: "1040px", height: "660px" })
+    expect(screen.getByRole("button", { name: "Resize calculator" })).toBeInTheDocument()
   })
 
   it("reacts to system color-scheme changes and scopes explicit light mode", () => {

@@ -8,7 +8,7 @@ export default defineConfig({
     dts({
       entryRoot: "src",
       tsconfigPath: path.resolve(import.meta.dirname, "tsconfig.json"),
-      include: ["src/index.ts", "src/mirai-calculator/**/*.ts"],
+      include: ["src/mirai-calculator/**/*.ts"],
       exclude: ["src/**/__tests__/**"],
       insertTypesEntry: true,
     }),
@@ -16,11 +16,16 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        index: path.resolve(import.meta.dirname, "src/index.ts"),
         configuration: path.resolve(import.meta.dirname, "src/mirai-calculator/configuration.ts"),
         engine: path.resolve(import.meta.dirname, "src/mirai-calculator/calculator-engine.ts"),
         graphing: path.resolve(import.meta.dirname, "src/mirai-calculator/graphing.ts"),
+        "graphing-data": path.resolve(import.meta.dirname, "src/mirai-calculator/graphing-data.ts"),
+        "graphing-view": path.resolve(import.meta.dirname, "src/mirai-calculator/graphing-view.ts"),
         statistics: path.resolve(import.meta.dirname, "src/mirai-calculator/statistics.ts"),
+        "statistics-data": path.resolve(
+          import.meta.dirname,
+          "src/mirai-calculator/statistics-data.ts"
+        ),
         tools: path.resolve(import.meta.dirname, "src/mirai-calculator/tools.ts"),
       },
       name: "OpenMiraiCalculatorCore",
@@ -39,6 +44,13 @@ export default defineConfig({
       reporter: ["text", "html"],
       include: ["src/**/*.ts"],
       exclude: ["src/**/__tests__/**"],
+      thresholds: {
+        autoUpdate: process.env.COVERAGE_RATCHET ? Math.floor : false,
+        statements: 96,
+        branches: 93,
+        functions: 98,
+        lines: 96,
+      },
     },
   },
 })

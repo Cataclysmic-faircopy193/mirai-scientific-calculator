@@ -1,6 +1,10 @@
 name: Deploy site to Cloudflare
 
 on:
+  push:
+    tags:
+      - "v*"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

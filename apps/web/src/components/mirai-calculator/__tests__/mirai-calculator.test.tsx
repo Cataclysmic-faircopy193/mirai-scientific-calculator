@@ -5,16 +5,15 @@ import { describe, expect, it, vi } from "vitest"
 import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 
 describe("MiraiCalculator", () => {
-  it("keeps the OpenMirai logo in the calculator chrome", () => {
+  it("does not embed OpenMirai branding in the calculator chrome", () => {
     render(<MiraiCalculator extensions={[]} />)
 
-    expect(screen.getByRole("img", { name: "OpenMirai" })).toBeInTheDocument()
+    expect(screen.queryByRole("img", { name: "OpenMirai" })).not.toBeInTheDocument()
   })
 
   it("does not bundle the playground practice scene into the registry component", () => {
     const { container } = render(<MiraiCalculator />)
 
-    expect(container.querySelectorAll('svg[aria-label="OpenMirai"]')).toHaveLength(1)
     expect(screen.queryByText("Practice session")).not.toBeInTheDocument()
     expect(container.querySelector("[data-playground-backdrop]")).not.toBeInTheDocument()
   })
@@ -30,6 +29,82 @@ describe("MiraiCalculator", () => {
 
     expect(screen.getAllByText("56")).toHaveLength(2)
     expect(screen.getByText("7×8")).toBeInTheDocument()
+  })
+
+  it("does not duplicate an unchanged calculation when equals is pressed repeatedly", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator defaultTheme="light" />)
+
+    await user.click(screen.getByRole("button", { name: "7" }))
+    await user.click(screen.getByRole("button", { name: "Multiply" }))
+    await user.click(screen.getByRole("button", { name: "8" }))
+    await user.click(screen.getByRole("button", { name: "Equals" }))
+    await user.click(screen.getByRole("button", { name: "Equals" }))
+
+    expect(screen.getAllByText("56")).toHaveLength(2)
+    expect(screen.getAllByText("7×8")).toHaveLength(1)
+  })
+
+  it("completes an omitted closing parenthesis when Enter evaluates an expression", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator defaultTheme="light" />)
+
+    const expression = screen.getByLabelText("Calculator expression")
+    await user.type(expression, "sqrt(2")
+    await user.keyboard("{Enter}")
+
+    expect(expression).toHaveValue("√(2)")
+    expect(screen.getByText("√(2)")).toBeInTheDocument()
+    expect(screen.getAllByText(/^1\.4142/)).toHaveLength(2)
+  })
+
+  it("formats typed math aliases and evaluates incomplete expressions live", async () => {
+    const user = userEvent.setup()
+    render(<MiraiCalculator defaultTheme="light" />)
+
+    const expression = screen.getByLabelText("Calculator expression")
+    const result = expression.parentElement?.querySelector('[aria-live="polite"]')
+    if (!result) {
+      throw new Error("Expected the live calculator result")
+    }
+
+    await user.type(expression, "2^10")
+    expect(expression).toHaveValue("2¹⁰")
+    expect(result).toHaveTextContent("=1,024")
+
+    await user.clear(expression)
+    await user.type(expression, "sqrt(9")
+    expect(expression).toHaveValue("√(9")
+    expect(result).toHaveTextContent("=3")
+  })
+
+  it("renders scripted scientific key labels with structured math typography", () => {
+    render(<MiraiCalculator defaultTheme="light" />)
+
+    const expression = screen.getByLabelText("Calculator expression")
+    const squared = screen.getByRole("button", { name: "x²" })
+    const fraction = document.querySelector<HTMLButtonElement>('button[aria-label="Fraction"]')
+    if (!fraction) {
+      throw new Error("Expected the scientific fraction key")
+    }
+
+    expect(squared.querySelector("sup")).toHaveTextContent("2")
+    expect(fraction.querySelector("[data-math-fraction]")).toHaveTextContent("a⁄b")
+    expect(squared.querySelector("[data-math-notation]")).toHaveAttribute("aria-hidden", "true")
+    expect(expression.className).toContain("font-[math,var(--font-sans,system-ui),sans-serif]!")
+    expect(expression).toHaveClass("text-3xl!")
+    expect(squared).toHaveClass("data-[key-label-size=single]:text-lg")
+    expect(squared.className).not.toMatch(/text-\[/)
+  })
+
+  it("allows the scientific keypad tabs to scroll on narrow calculators", () => {
+    render(<MiraiCalculator defaultTheme="light" />)
+
+    expect(screen.getByRole("tablist")).toHaveClass(
+      "overflow-x-auto",
+      "overflow-y-hidden",
+      "overscroll-x-contain"
+    )
   })
 
   it("inserts paired absolute-value bars and evaluates implicit multiplication", async () => {

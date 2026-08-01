@@ -12,7 +12,7 @@ export function NotFoundPage() {
         <Badge variant="outline" className="font-mono">
           404 / OUT OF RANGE
         </Badge>
-        <h1 className="mt-6 text-5xl font-semibold tracking-[-0.05em]">No value at this point.</h1>
+        <h1 className="mt-6 text-5xl font-semibold tracking-tighter">No value at this point.</h1>
         <p className="mx-auto mt-4 max-w-lg text-muted-foreground">
           The route is outside the current calculator domain.
         </p>

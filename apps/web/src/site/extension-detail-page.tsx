@@ -11,7 +11,9 @@ import { getExtension } from "@/site/site-data"
 export function ExtensionDetailPage({ extensionId }: { extensionId: string }) {
   const extension = getExtension(extensionId)
 
-  if (!extension) return <NotFoundPage />
+  if (!extension) {
+    return <NotFoundPage />
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-14 md:px-8 lg:px-10 lg:py-16">
@@ -46,7 +48,7 @@ export function ExtensionDetailPage({ extensionId }: { extensionId: string }) {
 
         <CodePreview
           preview={
-            <div className="h-[670px]">
+            <div className="h-167.5">
               <MiraiCalculator
                 extensions={[extension.id]}
                 defaultMode={extension.id}

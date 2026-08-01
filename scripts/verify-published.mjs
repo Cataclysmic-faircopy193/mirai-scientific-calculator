@@ -12,7 +12,6 @@ for (let attempt = 1; attempt <= 12; attempt += 1) {
   )
 
   if (result.status === 0 && result.stdout.trim() === packageJson.version) {
-    console.log(`Verified ${specifier} on npmjs.`)
     process.exit(0)
   }
 

@@ -1,142 +1,14 @@
-import { CalculatorEngine } from "./calculator-engine"
-
-export interface GraphView {
-  xmin: number
-  xmax: number
-  ymin: number
-  ymax: number
-}
-
-export interface GraphPoint {
-  x: number
-  y: number
-}
-
-export interface GraphSegment {
-  from: GraphPoint
-  to: GraphPoint
-}
+import type { CalculatorEngine } from "./calculator-engine"
+import { isValidGraphView } from "./graphing-view"
+import type { GraphPoint, GraphSegment, GraphView } from "./graphing-view"
 
 export interface GraphPointCluster {
   point: GraphPoint
-  indexes: number[]
-}
-
-export interface GraphProjection {
-  point: GraphPoint
-  distance: number
+  indexes: Array<number>
 }
 
 interface ContourSample extends GraphPoint {
   value: number
-}
-
-function validView(view: GraphView): boolean {
-  return (
-    Number.isFinite(view.xmin) &&
-    Number.isFinite(view.xmax) &&
-    Number.isFinite(view.ymin) &&
-    Number.isFinite(view.ymax) &&
-    view.xmin < view.xmax &&
-    view.ymin < view.ymax
-  )
-}
-
-/** Expands a graph view to match a canvas aspect ratio without cropping its requested bounds. */
-export function fitGraphViewToAspect(view: GraphView, width: number, height: number): GraphView {
-  if (!validView(view) || !Number.isFinite(width) || !Number.isFinite(height)) return view
-  if (width <= 0 || height <= 0) return view
-
-  const centerX = (view.xmin + view.xmax) / 2
-  const centerY = (view.ymin + view.ymax) / 2
-  const xSpan = view.xmax - view.xmin
-  const ySpan = view.ymax - view.ymin
-  const canvasAspect = width / height
-  const viewAspect = xSpan / ySpan
-
-  if (viewAspect < canvasAspect) {
-    const halfWidth = (ySpan * canvasAspect) / 2
-    return {
-      xmin: centerX - halfWidth,
-      xmax: centerX + halfWidth,
-      ymin: view.ymin,
-      ymax: view.ymax,
-    }
-  }
-
-  if (viewAspect > canvasAspect) {
-    const halfHeight = xSpan / canvasAspect / 2
-    return {
-      xmin: view.xmin,
-      xmax: view.xmax,
-      ymin: centerY - halfHeight,
-      ymax: centerY + halfHeight,
-    }
-  }
-
-  return view
-}
-
-/** Projects a graph-space pointer onto the nearest rendered curve segment in canvas pixels. */
-export function projectPointToGraphSegments(
-  segments: readonly GraphSegment[],
-  pointer: GraphPoint,
-  view: GraphView,
-  width: number,
-  height: number
-): GraphProjection | null {
-  if (
-    !validView(view) ||
-    !Number.isFinite(pointer.x) ||
-    !Number.isFinite(pointer.y) ||
-    !Number.isFinite(width) ||
-    !Number.isFinite(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return null
-  }
-
-  const xScale = width / (view.xmax - view.xmin)
-  const yScale = height / (view.ymax - view.ymin)
-  const pointerX = (pointer.x - view.xmin) * xScale
-  const pointerY = (view.ymax - pointer.y) * yScale
-  let closest: GraphProjection | null = null
-
-  for (const segment of segments) {
-    if (![segment.from.x, segment.from.y, segment.to.x, segment.to.y].every(Number.isFinite)) {
-      continue
-    }
-
-    const fromX = (segment.from.x - view.xmin) * xScale
-    const fromY = (view.ymax - segment.from.y) * yScale
-    const toX = (segment.to.x - view.xmin) * xScale
-    const toY = (view.ymax - segment.to.y) * yScale
-    const deltaX = toX - fromX
-    const deltaY = toY - fromY
-    const squaredLength = deltaX * deltaX + deltaY * deltaY
-    const interpolation =
-      squaredLength === 0
-        ? 0
-        : Math.max(
-            0,
-            Math.min(1, ((pointerX - fromX) * deltaX + (pointerY - fromY) * deltaY) / squaredLength)
-          )
-    const projectedX = fromX + deltaX * interpolation
-    const projectedY = fromY + deltaY * interpolation
-    const distance = Math.hypot(projectedX - pointerX, projectedY - pointerY)
-
-    if (closest !== null && distance >= closest.distance) continue
-    closest = {
-      point: {
-        x: segment.from.x + (segment.to.x - segment.from.x) * interpolation,
-        y: segment.from.y + (segment.to.y - segment.from.y) * interpolation,
-      },
-      distance,
-    }
-  }
-
-  return closest
 }
 
 /** Samples an explicit x- or y-axis function into discontinuity-safe graph segments. */
@@ -146,9 +18,9 @@ export function sampleExplicitGraphSegments(
   view: GraphView,
   width: number,
   height: number
-): GraphSegment[] {
+): Array<GraphSegment> {
   if (
-    !validView(view) ||
+    !isValidGraphView(view) ||
     !Number.isFinite(width) ||
     !Number.isFinite(height) ||
     width <= 0 ||
@@ -162,7 +34,7 @@ export function sampleExplicitGraphSegments(
   const maximum = axis === "y" ? view.xmax : view.ymax
   const xToCanvas = (x: number) => ((x - view.xmin) / (view.xmax - view.xmin)) * width
   const yToCanvas = (y: number) => height - ((y - view.ymin) / (view.ymax - view.ymin)) * height
-  const segments: GraphSegment[] = []
+  const segments: Array<GraphSegment> = []
   let previousGraphPoint: GraphPoint | null = null
   let previousCanvasPoint: GraphPoint | null = null
 
@@ -208,11 +80,26 @@ export function sampleExplicitGraphSegments(
 
 /** Selects a readable base-10 grid interval for the supplied visible span. */
 export function graphGridStep(span: number): number {
-  if (!Number.isFinite(span) || span <= 0) throw new Error("Graph span must be positive and finite")
+  if (!Number.isFinite(span) || span <= 0) {
+    throw new Error("Graph span must be positive and finite")
+  }
   const rough = span / 10
   const power = 10 ** Math.floor(Math.log10(rough))
   const normalized = rough / power
-  const factor = normalized < 1.5 ? 1 : normalized < 3 ? 2 : normalized < 7 ? 5 : 10
+  let factor: number
+  switch (true) {
+    case normalized < 1.5:
+      factor = 1
+      break
+    case normalized < 3:
+      factor = 2
+      break
+    case normalized < 7:
+      factor = 5
+      break
+    default:
+      factor = 10
+  }
   return factor * power
 }
 
@@ -229,12 +116,22 @@ function evaluateResidual(
   }
 }
 
-function interpolateZero(first: ContourSample, second: ContourSample): GraphPoint[] {
-  if (!Number.isFinite(first.value) || !Number.isFinite(second.value)) return []
-  if (first.value === 0 && second.value === 0) return [first, second]
-  if (first.value === 0) return [first]
-  if (second.value === 0) return [second]
-  if (Math.sign(first.value) === Math.sign(second.value)) return []
+function interpolateZero(first: ContourSample, second: ContourSample): Array<GraphPoint> {
+  if (!Number.isFinite(first.value) || !Number.isFinite(second.value)) {
+    return []
+  }
+  if (first.value === 0 && second.value === 0) {
+    return [first, second]
+  }
+  if (first.value === 0) {
+    return [first]
+  }
+  if (second.value === 0) {
+    return [second]
+  }
+  if (Math.sign(first.value) === Math.sign(second.value)) {
+    return []
+  }
 
   const interpolation = first.value / (first.value - second.value)
   return [
@@ -251,9 +148,9 @@ function samePoint(left: GraphPoint, right: GraphPoint, tolerance: number): bool
 
 /** Groups finite graph points that overlap within a Euclidean tolerance. */
 export function clusterGraphPoints(
-  points: readonly GraphPoint[],
+  points: ReadonlyArray<GraphPoint>,
   tolerance: number
-): GraphPointCluster[] {
+): Array<GraphPointCluster> {
   if (!Number.isFinite(tolerance) || tolerance < 0) {
     throw new Error("Graph point tolerance must be finite and non-negative")
   }
@@ -263,19 +160,24 @@ export function clusterGraphPoints(
 
   const parents = points.map((_, index) => index)
   const find = (index: number): number => {
-    let root = index
-    while (parents[root] !== root) root = parents[root]
-    while (parents[index] !== index) {
-      const parent = parents[index]
-      parents[index] = root
-      index = parent
+    let currentIndex = index
+    let root = currentIndex
+    while (parents[root] !== root) {
+      root = parents[root]
+    }
+    while (parents[currentIndex] !== currentIndex) {
+      const parent = parents[currentIndex]
+      parents[currentIndex] = root
+      currentIndex = parent
     }
     return root
   }
   const union = (left: number, right: number) => {
     const leftRoot = find(left)
     const rightRoot = find(right)
-    if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot
+    if (leftRoot !== rightRoot) {
+      parents[rightRoot] = leftRoot
+    }
   }
 
   for (let left = 0; left < points.length; left += 1) {
@@ -288,7 +190,7 @@ export function clusterGraphPoints(
     }
   }
 
-  const groups = new Map<number, number[]>()
+  const groups = new Map<number, Array<number>>()
   points.forEach((_, index) => {
     const root = find(index)
     groups.set(root, [...(groups.get(root) ?? []), index])
@@ -309,7 +211,9 @@ function triangleSegment(
   third: ContourSample,
   tolerance: number
 ): GraphSegment | null {
-  if (![first.value, second.value, third.value].every(Number.isFinite)) return null
+  if (![first.value, second.value, third.value].every(Number.isFinite)) {
+    return null
+  }
 
   const intersections = [
     ...interpolateZero(first, second),
@@ -320,7 +224,9 @@ function triangleSegment(
       points.findIndex((candidate) => samePoint(candidate, point, tolerance)) === index
   )
 
-  if (intersections.length === 0) return null
+  if (intersections.length === 0) {
+    return null
+  }
   if (intersections.length === 1) {
     return { from: intersections[0], to: intersections[0] }
   }
@@ -359,14 +265,20 @@ function findTouchingZero(
   xmax: number,
   ymin: number,
   ymax: number,
-  initialSamples: ContourSample[]
+  initialSamples: Array<ContourSample>
 ): GraphPoint | null {
-  if (!initialSamples.every((sample) => Number.isFinite(sample.value))) return null
+  if (!initialSamples.every((sample) => Number.isFinite(sample.value))) {
+    return null
+  }
   const magnitudes = initialSamples.map((sample) => Math.abs(sample.value))
   const referenceMagnitude = Math.max(...magnitudes)
   const minimumMagnitude = Math.min(...magnitudes)
-  if (referenceMagnitude === 0) return initialSamples[0]
-  if (minimumMagnitude > referenceMagnitude * 0.3) return null
+  if (referenceMagnitude === 0) {
+    return initialSamples[0]
+  }
+  if (minimumMagnitude > referenceMagnitude * 0.3) {
+    return null
+  }
 
   let best = initialSamples[magnitudes.indexOf(minimumMagnitude)]
   let stepX = (xmax - xmin) / 2
@@ -397,7 +309,7 @@ interface TouchingZeroCandidate {
   xmax: number
   ymin: number
   ymax: number
-  samples: ContourSample[]
+  samples: Array<ContourSample>
   score: number
 }
 
@@ -410,7 +322,9 @@ function touchingZeroCandidate(
   topLeft: ContourSample
 ): TouchingZeroCandidate | null {
   const samples = [bottomLeft, bottomRight, topRight, topLeft]
-  if (!samples.every((sample) => Number.isFinite(sample.value))) return null
+  if (!samples.every((sample) => Number.isFinite(sample.value))) {
+    return null
+  }
   const magnitudes = samples.map((sample) => Math.abs(sample.value))
   const maximum = Math.max(...magnitudes)
   const minimum = Math.min(...magnitudes)
@@ -425,7 +339,9 @@ function touchingZeroCandidate(
     }
   }
   const score = minimum / maximum
-  if (score > 0.3) return null
+  if (score > 0.3) {
+    return null
+  }
   return {
     xmin: bottomLeft.x,
     xmax: bottomRight.x,
@@ -443,7 +359,7 @@ function contourCellSegments(
   topLeft: ContourSample,
   residual: (x: number, y: number) => number,
   tolerance: number
-): GraphSegment[] {
+): Array<GraphSegment> {
   const intersections = [
     ...interpolateZero(bottomLeft, bottomRight),
     ...interpolateZero(bottomRight, topRight),
@@ -454,8 +370,12 @@ function contourCellSegments(
       points.findIndex((candidate) => samePoint(candidate, point, tolerance)) === index
   )
 
-  if (intersections.length < 2) return []
-  if (intersections.length === 2) return [{ from: intersections[0], to: intersections[1] }]
+  if (intersections.length < 2) {
+    return []
+  }
+  if (intersections.length === 2) {
+    return [{ from: intersections[0], to: intersections[1] }]
+  }
 
   const centerX = (bottomLeft.x + topRight.x) / 2
   const centerY = (bottomLeft.y + topRight.y) / 2
@@ -478,9 +398,13 @@ export function sampleImplicitContourSegments(
   view: GraphView,
   columns: number,
   rows: number
-): GraphSegment[] {
-  if (!validView(view) || !Number.isInteger(columns) || !Number.isInteger(rows)) return []
-  if (columns < 1 || rows < 1 || columns > 512 || rows > 512) return []
+): Array<GraphSegment> {
+  if (!isValidGraphView(view) || !Number.isInteger(columns) || !Number.isInteger(rows)) {
+    return []
+  }
+  if (columns < 1 || rows < 1 || columns > 512 || rows > 512) {
+    return []
+  }
 
   const xSpan = view.xmax - view.xmin
   const ySpan = view.ymax - view.ymin
@@ -492,14 +416,18 @@ export function sampleImplicitContourSegments(
       return { x, y, value: evaluateResidual(residual, x, y) }
     })
   })
-  const segments: GraphSegment[] = []
+  const segments: Array<GraphSegment> = []
   const seen = new Set<string>()
-  const touchingCandidates: TouchingZeroCandidate[] = []
+  const touchingCandidates: Array<TouchingZeroCandidate> = []
 
   const addSegment = (segment: GraphSegment | null) => {
-    if (!segment) return
+    if (!segment) {
+      return
+    }
     const key = segmentKey(segment, tolerance)
-    if (seen.has(key)) return
+    if (seen.has(key)) {
+      return
+    }
     seen.add(key)
     segments.push(segment)
   }
@@ -523,7 +451,9 @@ export function sampleImplicitContourSegments(
       }
       if (segments.length === segmentCountBeforeCell) {
         const candidate = touchingZeroCandidate(bottomLeft, bottomRight, topRight, topLeft)
-        if (candidate) touchingCandidates.push(candidate)
+        if (candidate) {
+          touchingCandidates.push(candidate)
+        }
       }
     }
   }
@@ -545,7 +475,9 @@ export function sampleImplicitContourSegments(
       candidate.ymax,
       [...candidate.samples, center]
     )
-    if (!touchingZero) continue
+    if (!touchingZero) {
+      continue
+    }
     const nearbyContour = segments.some(
       ({ from, to }) =>
         Math.hypot(from.x - touchingZero.x, from.y - touchingZero.y) <=
@@ -553,7 +485,9 @@ export function sampleImplicitContourSegments(
         Math.hypot(to.x - touchingZero.x, to.y - touchingZero.y) <=
           Math.max(xSpan / columns, ySpan / rows) * 1.5
     )
-    if (!nearbyContour) addSegment({ from: touchingZero, to: touchingZero })
+    if (!nearbyContour) {
+      addSegment({ from: touchingZero, to: touchingZero })
+    }
   }
 
   return segments
@@ -566,7 +500,9 @@ export function shouldBreakGraphPath(
   width: number,
   height: number
 ): boolean {
-  if (![previous.x, previous.y, next.x, next.y].every(Number.isFinite)) return true
+  if (![previous.x, previous.y, next.x, next.y].every(Number.isFinite)) {
+    return true
+  }
   return Math.abs(next.x - previous.x) > width / 2 || Math.abs(next.y - previous.y) > height / 2
 }
 
@@ -584,7 +520,7 @@ export type CompiledGraphExpression =
     }
   | {
       kind: "points"
-      points: GraphPoint[]
+      points: Array<GraphPoint>
       source: string
     }
   | {
@@ -611,7 +547,9 @@ function validateSearchRange(xmin: number, xmax: number, samples: number): void 
   if (!Number.isFinite(xmin) || !Number.isFinite(xmax)) {
     throw new Error("Graph bounds must be finite")
   }
-  if (xmin >= xmax) throw new Error("Graph minimum must be less than maximum")
+  if (xmin >= xmax) {
+    throw new Error("Graph minimum must be less than maximum")
+  }
   if (!Number.isInteger(samples) || samples < 2 || samples > MAX_GRAPH_SAMPLES) {
     throw new Error(`Graph samples must be a whole number from 2 to ${MAX_GRAPH_SAMPLES}`)
   }
@@ -632,7 +570,9 @@ function sampleCoordinate(xmin: number, xmax: number, index: number, samples: nu
 
 function numeric(engine: CalculatorEngine, source: string, locals: Record<string, number>): number {
   const value = engine.evaluate(source, locals)
-  if (typeof value !== "number") throw new Error("Expected a numeric result")
+  if (typeof value !== "number") {
+    throw new Error("Expected a numeric result")
+  }
   return value
 }
 
@@ -736,7 +676,9 @@ function bisectRoot(fn: (x: number) => number, left: number, right: number): num
   let high = right
   let lowValue = fn(low)
   const highValue = fn(high)
-  if (!Number.isFinite(lowValue) || !Number.isFinite(highValue)) return null
+  if (!Number.isFinite(lowValue) || !Number.isFinite(highValue)) {
+    return null
+  }
   let bestX = Math.abs(lowValue) <= Math.abs(highValue) ? low : right
   let bestMagnitude = Math.min(Math.abs(lowValue), Math.abs(highValue))
   const initialMagnitude = bestMagnitude
@@ -744,13 +686,17 @@ function bisectRoot(fn: (x: number) => number, left: number, right: number): num
   for (let iteration = 0; iteration < 64; iteration += 1) {
     const midpoint = stableMidpoint(low, high)
     const midpointValue = fn(midpoint)
-    if (!Number.isFinite(midpointValue)) return null
+    if (!Number.isFinite(midpointValue)) {
+      return null
+    }
     const magnitude = Math.abs(midpointValue)
     if (magnitude < bestMagnitude) {
       bestMagnitude = magnitude
       bestX = midpoint
     }
-    if (midpointValue === 0) return midpoint
+    if (midpointValue === 0) {
+      return midpoint
+    }
     if (Math.sign(lowValue) === Math.sign(midpointValue)) {
       low = midpoint
       lowValue = midpointValue
@@ -773,13 +719,16 @@ function minimizeAbsolute(fn: (x: number) => number, left: number, right: number
     if (!Number.isFinite(firstValue) || !Number.isFinite(secondValue)) {
       return null
     }
-    if (Math.abs(firstValue) <= Math.abs(secondValue)) high = second
-    else low = first
+    if (Math.abs(firstValue) <= Math.abs(secondValue)) {
+      high = second
+    } else {
+      low = first
+    }
   }
   return stableMidpoint(low, high)
 }
 
-function deduplicate(values: number[], tolerance: number): number[] {
+function deduplicate(values: Array<number>, tolerance: number): Array<number> {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted.filter(
     (value, index) => index === 0 || Math.abs(value - sorted[index - 1]) > tolerance
@@ -792,19 +741,21 @@ export function findRoots(
   xmin: number,
   xmax: number,
   samples = 640
-): number[] {
+): Array<number> {
   validateSearchRange(xmin, xmax, samples)
-  const roots: number[] = []
+  const roots: Array<number> = []
   const step = sampleStep(xmin, xmax, samples)
-  const xValues: number[] = []
-  const yValues: number[] = []
+  const xValues: Array<number> = []
+  const yValues: Array<number> = []
 
   for (let index = 0; index <= samples; index += 1) {
     const x = sampleCoordinate(xmin, xmax, index, samples)
     const value = fn(x)
     xValues.push(x)
     yValues.push(value)
-    if (Number.isFinite(value) && value === 0) roots.push(x)
+    if (Number.isFinite(value) && value === 0) {
+      roots.push(x)
+    }
     if (index > 0 && Number.isFinite(value)) {
       const previousValue = yValues[index - 1]
       if (
@@ -813,7 +764,9 @@ export function findRoots(
         Math.sign(value) !== Math.sign(previousValue)
       ) {
         const root = bisectRoot(fn, xValues[index - 1], x)
-        if (root !== null) roots.push(root)
+        if (root !== null) {
+          roots.push(root)
+        }
       }
     }
   }
@@ -822,11 +775,17 @@ export function findRoots(
     const before = yValues[index - 1]
     const value = yValues[index]
     const after = yValues[index + 1]
-    if (![before, value, after].every(Number.isFinite)) continue
-    if (value === 0) continue
+    if (![before, value, after].every(Number.isFinite)) {
+      continue
+    }
+    if (value === 0) {
+      continue
+    }
     if (Math.abs(value) < Math.abs(before) && Math.abs(value) <= Math.abs(after)) {
       const candidate = minimizeAbsolute(fn, xValues[index - 1], xValues[index + 1])
-      if (candidate === null) continue
+      if (candidate === null) {
+        continue
+      }
       const candidateValue = fn(candidate)
       const neighborMagnitude = Math.min(Math.abs(before), Math.abs(after))
       if (
@@ -849,14 +808,16 @@ export function findIntersections(
   right: (x: number) => number,
   xmin: number,
   xmax: number
-): GraphPoint[] {
+): Array<GraphPoint> {
   let comparableSamples = 0
   let coincident = true
   for (let index = 0; index <= 32; index += 1) {
     const x = sampleCoordinate(xmin, xmax, index, 32)
     const leftValue = left(x)
     const rightValue = right(x)
-    if (!Number.isFinite(leftValue) && !Number.isFinite(rightValue)) continue
+    if (!Number.isFinite(leftValue) && !Number.isFinite(rightValue)) {
+      continue
+    }
     if (!Number.isFinite(leftValue) || !Number.isFinite(rightValue)) {
       coincident = false
       break
@@ -868,7 +829,9 @@ export function findIntersections(
       break
     }
   }
-  if (coincident && comparableSamples >= 3) return []
+  if (coincident && comparableSamples >= 3) {
+    return []
+  }
 
   const roots = findRoots((x) => left(x) - right(x), xmin, xmax)
   return roots.map((x) => ({ x, y: left(x) })).filter((point) => Number.isFinite(point.y))
@@ -891,7 +854,9 @@ export function findExtrema(
     const before = fn(sampleCoordinate(xmin, xmax, index - 1, samples))
     const value = fn(x)
     const after = fn(sampleCoordinate(xmin, xmax, index + 1, samples))
-    if (![before, value, after].every(Number.isFinite)) continue
+    if (![before, value, after].every(Number.isFinite)) {
+      continue
+    }
     const slope = after - value
     if (previousSlope !== null) {
       if (previousSlope > 0 && slope < 0) {

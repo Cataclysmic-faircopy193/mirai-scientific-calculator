@@ -15,7 +15,7 @@ export interface DescriptiveStatistics {
   sampleVariance: number
   populationStandardDeviation: number
   sampleStandardDeviation: number
-  sorted: number[]
+  sorted: Array<number>
 }
 
 export type RegressionModel =
@@ -34,9 +34,9 @@ export interface RegressionParameter {
 export interface RegressionResult {
   ok: boolean
   label: string
-  params: RegressionParameter[]
+  params: Array<RegressionParameter>
   r2: number
-  residuals: number[]
+  residuals: Array<number>
   predict: (x: number) => number
   message: string
 }
@@ -55,14 +55,16 @@ function addCompensated(accumulator: CompensatedAccumulator, value: number): voi
   accumulator.sum = next
 }
 
-function maximumAbsolute(values: readonly number[]): number {
+function maximumAbsolute(values: ReadonlyArray<number>): number {
   let maximum = 0
-  for (const value of values) maximum = Math.max(maximum, Math.abs(value))
+  for (const value of values) {
+    maximum = Math.max(maximum, Math.abs(value))
+  }
   return maximum
 }
 
 function compensatedSumCore(
-  values: readonly number[],
+  values: ReadonlyArray<number>,
   transform: (value: number, index: number) => number
 ): number {
   const accumulator: CompensatedAccumulator = { sum: 0, correction: 0 }
@@ -73,52 +75,31 @@ function compensatedSumCore(
 }
 
 function compensatedSum(
-  values: readonly number[],
+  values: ReadonlyArray<number>,
   transform: (value: number, index: number) => number = (value) => value
 ): number {
   const transformed = values.map(transform)
   const direct = compensatedSumCore(transformed, (value) => value)
-  if (Number.isFinite(direct)) return direct
+  if (Number.isFinite(direct)) {
+    return direct
+  }
 
   const scale = maximumAbsolute(transformed)
-  if (scale === 0) return direct
+  if (scale === 0) {
+    return direct
+  }
   return compensatedSumCore(transformed, (value) => value / scale) * scale
 }
 
-function stableMean(values: readonly number[]): number {
+function stableMean(values: ReadonlyArray<number>): number {
   const sum = compensatedSum(values)
   return Number.isFinite(sum)
     ? sum / values.length
     : compensatedSum(values, (value) => value / values.length)
 }
 
-/** Parses finite numeric values from whitespace-, comma-, or semicolon-delimited input. */
-export function parseNumberList(source: string): number[] {
-  return source
-    .trim()
-    .split(/[\s,;]+/)
-    .filter(Boolean)
-    .map(Number)
-    .filter(Number.isFinite)
-}
-
-/** Creates a padded numeric extent suitable for plotting a list of values. */
-export function calculateNumberExtent(values: readonly number[]): [number, number] {
-  if (values.length === 0) return [0, 1]
-  const minimum = Math.min(...values)
-  const maximum = Math.max(...values)
-  if (minimum === maximum) return [minimum - 1, maximum + 1]
-  const padding = (maximum - minimum) * 0.1
-  return [minimum - padding, maximum + padding]
-}
-
-/** Serializes initial statistics values for a plain-text numeric input. */
-export function serializeNumberList(values: readonly (number | string)[] | undefined): string {
-  return values?.join(", ") ?? ""
-}
-
 /** Interpolates a percentile from an already sorted finite numeric list. */
-export function quantile(sortedValues: number[], percentile: number): number {
+export function quantile(sortedValues: Array<number>, percentile: number): number {
   if (sortedValues.length === 0) {
     throw new Error("Quantile needs at least one value")
   }
@@ -131,12 +112,14 @@ export function quantile(sortedValues: number[], percentile: number): number {
   const upper = Math.ceil(index)
   const fraction = index - lower
 
-  if (fraction === 0) return sortedValues[lower]
+  if (fraction === 0) {
+    return sortedValues[lower]
+  }
   return compensatedSum([sortedValues[lower] * (1 - fraction), sortedValues[upper] * fraction])
 }
 
 /** Calculates descriptive statistics for a non-empty finite numeric sample. */
-export function calculateStatistics(values: number[]): DescriptiveStatistics {
+export function calculateStatistics(values: Array<number>): DescriptiveStatistics {
   if (values.length === 0) {
     throw new Error("At least one finite value is required")
   }
@@ -198,7 +181,7 @@ export function calculateStatistics(values: number[]): DescriptiveStatistics {
 }
 
 /** Calculates sample covariance for two paired finite lists. */
-export function covariance(xValues: number[], yValues: number[]): number {
+export function covariance(xValues: Array<number>, yValues: Array<number>): number {
   if (xValues.length !== yValues.length) {
     throw new Error("Paired lists must have the same length")
   }
@@ -209,11 +192,15 @@ export function covariance(xValues: number[], yValues: number[]): number {
     throw new Error("Covariance requires finite values")
   }
   const pairCount = xValues.length
-  if (pairCount < 2) throw new Error("At least two paired values are required")
+  if (pairCount < 2) {
+    throw new Error("At least two paired values are required")
+  }
 
   const xScale = maximumAbsolute(xValues)
   const yScale = maximumAbsolute(yValues)
-  if (xScale === 0 || yScale === 0) return 0
+  if (xScale === 0 || yScale === 0) {
+    return 0
+  }
 
   const normalizedXMean = stableMean(xValues.map((value) => value / xScale))
   const normalizedYMean = stableMean(yValues.map((value) => value / yScale))
@@ -231,7 +218,7 @@ export function covariance(xValues: number[], yValues: number[]): number {
 }
 
 /** Calculates the bounded Pearson correlation for two paired finite lists. */
-export function correlation(xValues: number[], yValues: number[]): number {
+export function correlation(xValues: Array<number>, yValues: Array<number>): number {
   if (xValues.length !== yValues.length) {
     throw new Error("Paired lists must have the same length")
   }
@@ -242,7 +229,9 @@ export function correlation(xValues: number[], yValues: number[]): number {
     throw new Error("Correlation requires finite values")
   }
   const pairCount = xValues.length
-  if (pairCount < 2) throw new Error("At least two paired values are required")
+  if (pairCount < 2) {
+    throw new Error("At least two paired values are required")
+  }
 
   const xScale = maximumAbsolute(xValues)
   const yScale = maximumAbsolute(yValues)
@@ -273,10 +262,15 @@ export function correlation(xValues: number[], yValues: number[]): number {
   return Math.max(-1, Math.min(1, crossTotal / denominator))
 }
 
-function solveLeastSquares(inputMatrix: number[][], inputVector: number[]): number[] | null {
+function solveLeastSquares(
+  inputMatrix: Array<Array<number>>,
+  inputVector: Array<number>
+): Array<number> | null {
   const rowCount = inputMatrix.length
   const columnCount = inputMatrix[0]?.length ?? 0
-  if (rowCount < columnCount || columnCount === 0) return null
+  if (rowCount < columnCount || columnCount === 0) {
+    return null
+  }
 
   const matrix = inputMatrix.map((row) => [...row])
   const vector = [...inputVector]
@@ -286,7 +280,9 @@ function solveLeastSquares(inputMatrix: number[][], inputVector: number[]): numb
     for (let row = column; row < rowCount; row += 1) {
       norm = Math.hypot(norm, matrix[row][column])
     }
-    if (norm <= Number.EPSILON * rowCount * 16) return null
+    if (norm <= Number.EPSILON * rowCount * 16) {
+      return null
+    }
 
     const alpha = matrix[column][column] >= 0 ? -norm : norm
     const householder = Array<number>(rowCount - column)
@@ -296,7 +292,9 @@ function solveLeastSquares(inputMatrix: number[][], inputVector: number[]): numb
       householder[row - column] = matrix[row][column]
       vectorNormSquared += householder[row - column] ** 2
     }
-    if (vectorNormSquared === 0) return null
+    if (vectorNormSquared === 0) {
+      return null
+    }
 
     for (let target = column; target < columnCount; target += 1) {
       let dot = householder[0] * matrix[column][target]
@@ -324,7 +322,9 @@ function solveLeastSquares(inputMatrix: number[][], inputVector: number[]): numb
   const solution = Array<number>(columnCount).fill(0)
   for (let row = columnCount - 1; row >= 0; row -= 1) {
     const diagonal = matrix[row][row]
-    if (Math.abs(diagonal) <= Number.EPSILON * rowCount * 16) return null
+    if (Math.abs(diagonal) <= Number.EPSILON * rowCount * 16) {
+      return null
+    }
     let remainder = vector[row]
     for (let column = row + 1; column < columnCount; column += 1) {
       remainder -= matrix[row][column] * solution[column]
@@ -335,27 +335,43 @@ function solveLeastSquares(inputMatrix: number[][], inputVector: number[]): numb
 }
 
 interface PolynomialFit {
-  coefficients: number[]
+  coefficients: Array<number>
   predict: (x: number) => number
 }
 
 function binomial(n: number, k: number): number {
-  if (k < 0 || k > n) return 0
-  if (k === 0 || k === n) return 1
-  if (n === 2) return 2
-  if (n === 3) return k === 1 || k === 2 ? 3 : 1
+  if (k < 0 || k > n) {
+    return 0
+  }
+  if (k === 0 || k === n) {
+    return 1
+  }
+  if (n === 2) {
+    return 2
+  }
+  if (n === 3) {
+    return k === 1 || k === 2 ? 3 : 1
+  }
   return 1
 }
 
-function fitPolynomial(xValues: number[], yValues: number[], degree: number): PolynomialFit | null {
+function fitPolynomial(
+  xValues: Array<number>,
+  yValues: Array<number>,
+  degree: number
+): PolynomialFit | null {
   const xScale = maximumAbsolute(xValues)
   const yScale = maximumAbsolute(yValues) || 1
-  if (xScale === 0) return null
+  if (xScale === 0) {
+    return null
+  }
 
   const normalizedX = xValues.map((value) => value / xScale)
   const normalizedCenter = stableMean(normalizedX)
   const normalizedSpread = maximumAbsolute(normalizedX.map((value) => value - normalizedCenter))
-  if (normalizedSpread === 0) return null
+  if (normalizedSpread === 0) {
+    return null
+  }
 
   const directCenter = stableMean(xValues)
   const directDeviations = xValues.map((value) => value - directCenter)
@@ -368,7 +384,9 @@ function fitPolynomial(xValues: number[], yValues: number[], degree: number): Po
     ? directDeviations.map((value) => value / spread)
     : normalizedX.map((value) => (value - center) / spread)
   const transform = (value: number) => {
-    if (!useDirectCentering) return (value / xScale - center) / spread
+    if (!useDirectCentering) {
+      return (value / xScale - center) / spread
+    }
     const delta = value - center
     return Number.isFinite(delta) ? delta / spread : value / spread - center / spread
   }
@@ -381,7 +399,9 @@ function fitPolynomial(xValues: number[], yValues: number[], degree: number): Po
     matrix,
     yValues.map((value) => value / yScale)
   )
-  if (!normalizedCoefficients) return null
+  if (!normalizedCoefficients) {
+    return null
+  }
 
   const predict = (x: number) => {
     const transformed = transform(x)
@@ -394,7 +414,7 @@ function fitPolynomial(xValues: number[], yValues: number[], degree: number): Po
 
   const coefficients = Array<number>(degree + 1).fill(0)
   for (let outputPower = 0; outputPower <= degree; outputPower += 1) {
-    const terms: number[] = []
+    const terms: Array<number> = []
     for (let normalizedPower = outputPower; normalizedPower <= degree; normalizedPower += 1) {
       const normalizedCoefficient = normalizedCoefficients[normalizedPower]
       const betaPower = normalizedPower - outputPower
@@ -431,9 +451,9 @@ function failedRegression(message: string): RegressionResult {
 
 function finalizeRegression(
   label: string,
-  params: RegressionParameter[],
-  xValues: number[],
-  yValues: number[],
+  params: Array<RegressionParameter>,
+  xValues: Array<number>,
+  yValues: Array<number>,
   predict: (x: number) => number
 ): RegressionResult {
   const predictions = xValues.map(predict)
@@ -458,12 +478,12 @@ function finalizeRegression(
       : compensatedSum(residuals, (residual) => (residual / residualScale) ** 2)
   const totalSquares =
     totalScale === 0 ? 0 : compensatedSum(deviations, (deviation) => (deviation / totalScale) ** 2)
-  const errorRatio =
-    totalScale === 0
-      ? residualScale === 0
-        ? 0
-        : 1
-      : (residualSquares / totalSquares) * (residualScale / totalScale) ** 2
+  let errorRatio: number
+  if (totalScale === 0) {
+    errorRatio = residualScale === 0 ? 0 : 1
+  } else {
+    errorRatio = (residualSquares / totalSquares) * (residualScale / totalScale) ** 2
+  }
 
   return {
     ok: true,
@@ -478,8 +498,8 @@ function finalizeRegression(
 
 /** Fits a supported regression model to paired finite x and y observations. */
 export function fitRegression(
-  xInput: number[],
-  yInput: number[],
+  xInput: Array<number>,
+  yInput: Array<number>,
   model: RegressionModel
 ): RegressionResult {
   if (xInput.length !== yInput.length) {
@@ -505,7 +525,9 @@ export function fitRegression(
     }
     const transformed = yValues.map(Math.log)
     const fit = fitPolynomial(xValues, transformed, 1)
-    if (!fit) return failedRegression("The data cannot be fitted.")
+    if (!fit) {
+      return failedRegression("The data cannot be fitted.")
+    }
     const a = Math.exp(fit.coefficients[0])
     const b = Math.exp(fit.coefficients[1])
     return finalizeRegression(
@@ -526,7 +548,9 @@ export function fitRegression(
     }
     const loggedX = xValues.map(Math.log)
     const fit = fitPolynomial(loggedX, yValues, 1)
-    if (!fit) return failedRegression("The data cannot be fitted.")
+    if (!fit) {
+      return failedRegression("The data cannot be fitted.")
+    }
     const [a, b] = fit.coefficients
     return finalizeRegression(
       "y = a + b ln(x)",
@@ -545,7 +569,9 @@ export function fitRegression(
       return failedRegression("Power regression needs positive x and y values.")
     }
     const fit = fitPolynomial(xValues.map(Math.log), yValues.map(Math.log), 1)
-    if (!fit) return failedRegression("The data cannot be fitted.")
+    if (!fit) {
+      return failedRegression("The data cannot be fitted.")
+    }
     const a = Math.exp(fit.coefficients[0])
     const b = fit.coefficients[1]
     return finalizeRegression(
@@ -560,7 +586,17 @@ export function fitRegression(
     )
   }
 
-  const degree = model === "cubic" ? 3 : model === "quadratic" ? 2 : 1
+  let degree: number
+  switch (model) {
+    case "cubic":
+      degree = 3
+      break
+    case "quadratic":
+      degree = 2
+      break
+    default:
+      degree = 1
+  }
   if (pairCount < degree + 1) {
     return failedRegression(
       `${model[0].toUpperCase()}${model.slice(1)} regression needs at least ${degree + 1} points.`
@@ -568,7 +604,9 @@ export function fitRegression(
   }
 
   const fit = fitPolynomial(xValues, yValues, degree)
-  if (!fit) return failedRegression("The data cannot be fitted.")
+  if (!fit) {
+    return failedRegression("The data cannot be fitted.")
+  }
 
   const { coefficients, predict } = fit
   const labels = ["a", "b", "c", "d"]
@@ -576,8 +614,17 @@ export function fitRegression(
     label: labels[index],
     value,
   }))
-  const label =
-    degree === 1 ? "y = a + bx" : degree === 2 ? "y = a + bx + cx²" : "y = a + bx + cx² + dx³"
+  let label: string
+  switch (degree) {
+    case 1:
+      label = "y = a + bx"
+      break
+    case 2:
+      label = "y = a + bx + cx²"
+      break
+    default:
+      label = "y = a + bx + cx² + dx³"
+  }
 
   return finalizeRegression(label, params, xValues, yValues, predict)
 }

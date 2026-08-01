@@ -4,6 +4,30 @@ import { Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+type CopyStatus = "idle" | "copied" | "error"
+
+function copyButtonLabel(status: CopyStatus, label: string): string {
+  switch (status) {
+    case "copied":
+      return "Copied"
+    case "error":
+      return "Copy failed"
+    case "idle":
+      return label
+  }
+}
+
+function copyButtonAnnouncement(status: CopyStatus): string {
+  switch (status) {
+    case "copied":
+      return "Copied to clipboard."
+    case "error":
+      return "Unable to copy to clipboard."
+    case "idle":
+      return ""
+  }
+}
+
 /** Copies provided text and announces the temporary copied state. */
 export function CopyButton({
   value,
@@ -14,7 +38,7 @@ export function CopyButton({
   label?: string
   className?: string
 }) {
-  const [status, setStatus] = useState<"idle" | "copied" | "error">("idle")
+  const [status, setStatus] = useState<CopyStatus>("idle")
   const resetTimer = useRef<number | undefined>(undefined)
 
   useEffect(
@@ -45,14 +69,10 @@ export function CopyButton({
         className={cn("site-copy-button", className)}
       >
         {status === "copied" ? <Check /> : <Copy />}
-        {status === "copied" ? "Copied" : status === "error" ? "Copy failed" : label}
+        {copyButtonLabel(status, label)}
       </Button>
       <span className="sr-only" aria-live="polite">
-        {status === "copied"
-          ? "Copied to clipboard."
-          : status === "error"
-            ? "Unable to copy to clipboard."
-            : ""}
+        {copyButtonAnnouncement(status)}
       </span>
     </>
   )

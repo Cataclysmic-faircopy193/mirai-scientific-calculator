@@ -40,7 +40,9 @@ export function CommandPalette({
 
   const filteredRoutes = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    if (!normalized) return SITE_ROUTES
+    if (!normalized) {
+      return SITE_ROUTES
+    }
     return SITE_ROUTES.filter((route) =>
       `${route.label} ${route.section} ${route.keywords}`.toLowerCase().includes(normalized)
     )
@@ -48,7 +50,9 @@ export function CommandPalette({
 
   const setOpen = (nextOpen: boolean) => {
     onOpenChange(nextOpen)
-    if (!nextOpen) setQuery("")
+    if (!nextOpen) {
+      setQuery("")
+    }
   }
 
   return (
@@ -61,14 +65,13 @@ export function CommandPalette({
         <div className="flex items-center gap-3 px-4">
           <Search className="size-4 shrink-0 text-muted-foreground" />
           <Input
-            autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search extensions and documentation..."
             aria-label="Search extensions and documentation"
             className="h-14 border-0 px-0 shadow-none focus-visible:ring-0"
           />
-          <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
             ESC
           </kbd>
         </div>
@@ -82,13 +85,15 @@ export function CommandPalette({
             ) : (
               COMMAND_MENU_GROUPS.map((group, groupIndex) => {
                 const routes = filteredRoutes.filter((route) => route.section === group)
-                if (routes.length === 0) return null
+                if (routes.length === 0) {
+                  return null
+                }
                 return (
                   <section key={group} aria-labelledby={`command-${group}`} className="py-2">
                     {groupIndex > 0 && <Separator className="mb-4" />}
                     <h2
                       id={`command-${group}`}
-                      className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
+                      className="px-3 pb-2 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground"
                     >
                       {group}
                     </h2>

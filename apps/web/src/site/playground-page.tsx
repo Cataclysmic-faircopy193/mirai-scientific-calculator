@@ -1,7 +1,6 @@
 import { ArrowDown, ArrowUp, RotateCcw } from "lucide-react"
 import { domAnimation, LazyMotion, m, MotionConfig } from "motion/react"
 
-import { type CalculatorExtension as CalculatorExtensionValue } from "@/components/mirai-calculator/mirai-calculator"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -26,11 +25,12 @@ import {
   PLAYGROUND_STATISTICS_DATA,
   PLAYGROUND_TOOLS_DATA,
   serializePlaygroundExtensions,
-  type PlaygroundSearch,
 } from "@/site/constants/playground"
+import type { PlaygroundSearch } from "@/site/constants/playground"
 import { CodePreview } from "@/site/code-preview"
 import { PlaygroundCalculatorPreview } from "@/site/playground-calculator-preview"
 import { EXTENSIONS } from "@/site/site-data"
+import type { CalculatorExtension as CalculatorExtensionValue } from "@openmirai/calculator-core/configuration"
 
 /** Renders the URL-synchronized calculator configurator and generated source preview. */
 export function PlaygroundPage({
@@ -57,7 +57,7 @@ export function PlaygroundPage({
     toolsData: PLAYGROUND_TOOLS_DATA,
   })
 
-  const setExtensions = (nextExtensions: readonly CalculatorExtensionValue[]) => {
+  const setExtensions = (nextExtensions: ReadonlyArray<CalculatorExtensionValue>) => {
     const nextMode = nextExtensions.includes(activeMode) ? activeMode : nextExtensions[0]
     onSearchChange({
       ...search,
@@ -67,7 +67,7 @@ export function PlaygroundPage({
   }
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-14 md:px-8 lg:px-10">
+    <div className="mx-auto max-w-375 px-5 py-14 md:px-8 lg:px-10">
       <div className="flex flex-col gap-5 border-b pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-medium text-primary">URL-synced configuration</p>
@@ -101,7 +101,7 @@ export function PlaygroundPage({
                         key={extension.id}
                         className="relative grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border p-3"
                       >
-                        <label className="flex min-w-0 cursor-pointer items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
                           <Switch
                             checked={enabled}
                             onCheckedChange={(checked) =>
@@ -121,7 +121,7 @@ export function PlaygroundPage({
                               {extension.eyebrow}
                             </small>
                           </span>
-                        </label>
+                        </div>
                         <div className="flex">
                           <Button
                             size="icon-sm"
@@ -159,17 +159,19 @@ export function PlaygroundPage({
               <CardTitle>Display</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-5">
-              <label className="grid gap-2 text-sm">
-                Active extension
+              <div className="grid gap-2 text-sm">
+                <span>Active extension</span>
                 <Select
                   value={activeMode}
                   disabled={extensions.length === 0}
                   onValueChange={(value) => {
-                    if (typeof value !== "string") return
+                    if (typeof value !== "string") {
+                      return
+                    }
                     onSearchChange({ ...search, mode: value })
                   }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Active extension">
                     <SelectValue placeholder="No extension enabled">
                       {activeExtensionLabel}
                     </SelectValue>
@@ -182,18 +184,20 @@ export function PlaygroundPage({
                     ))}
                   </SelectContent>
                 </Select>
-              </label>
+              </div>
 
-              <label className="grid gap-2 text-sm">
-                Calculator theme
+              <div className="grid gap-2 text-sm">
+                <span>Calculator theme</span>
                 <Select
                   value={search.calculatorTheme}
                   onValueChange={(value) => {
-                    if (value !== "light" && value !== "dark" && value !== "system") return
+                    if (value !== "light" && value !== "dark" && value !== "system") {
+                      return
+                    }
                     onSearchChange({ ...search, calculatorTheme: value })
                   }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Calculator theme">
                     <SelectValue>{calculatorThemeLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -204,17 +208,18 @@ export function PlaygroundPage({
                     ))}
                   </SelectContent>
                 </Select>
-              </label>
+              </div>
 
               <Separator />
 
-              <label className="flex cursor-pointer items-center justify-between gap-4 text-sm">
-                Practice backdrop
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span>Practice backdrop</span>
                 <Switch
+                  aria-label="Practice backdrop"
                   checked={search.backdrop}
                   onCheckedChange={(backdrop) => onSearchChange({ ...search, backdrop })}
                 />
-              </label>
+              </div>
             </CardContent>
           </Card>
         </aside>

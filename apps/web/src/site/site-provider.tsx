@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState } from "react"
 
-import { SiteContext, type SiteContextValue, type SiteTheme } from "@/site/site-context"
+import { SiteContext } from "@/site/site-context"
+import type { SiteContextValue, SiteTheme } from "@/site/site-context"
 import { THEME_STORAGE_KEY } from "@/site/constants/site"
 
 function readInitialTheme(): SiteTheme {
-  if (typeof document === "undefined") return "dark"
+  if (typeof document === "undefined") {
+    return "dark"
+  }
   return document.documentElement.classList.contains("dark") ? "dark" : "light"
 }
 
 /** Provides shared showcase state for theme and command-palette behavior. */
-export function SiteProvider({ children }: { children: ReactNode }) {
+export function SiteProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<SiteTheme>(readInitialTheme)
 
   useEffect(() => {

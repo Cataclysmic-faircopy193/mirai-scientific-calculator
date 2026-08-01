@@ -13,16 +13,13 @@ const consumer = path.join(workspace, "consumer")
 const extracted = path.join(workspace, "extracted")
 const packageName = "@openmirai/calculator-core"
 const expectedRuntimeExports = {
-  [packageName]: [
-    "CalculatorEngine",
-    "calculatePercent",
-    "calculateStatistics",
-    "compileGraphExpression",
-    "evaluateExpression",
-  ],
+  [packageName]: ["CalculatorEngine", "evaluateExpression"],
+  [`${packageName}/configuration`]: ["CalculatorExtension", "normalizeCalculatorExtensions"],
   [`${packageName}/engine`]: ["CalculatorEngine", "evaluateExpression"],
   [`${packageName}/graphing`]: ["compileGraphExpression", "findRoots"],
+  [`${packageName}/graphing-view`]: ["graphPointToViewport", "zoomGraphView"],
   [`${packageName}/statistics`]: ["calculateStatistics", "fitRegression"],
+  [`${packageName}/statistics-data`]: ["buildHistogram", "parseNumberList"],
   [`${packageName}/tools`]: ["calculatePercent", "calculateRatio"],
 }
 
@@ -172,48 +169,43 @@ for (const name of ${JSON.stringify(exports)}) {
 
   await writeFile(
     path.join(consumer, "consumer.ts"),
-    `import {
-  CalculatorEngine,
-  calculatePercent,
-  calculateStatistics,
-  compileGraphExpression,
-  evaluateExpression,
-  type CalculatorValue,
-  type CompiledGraphExpression,
-} from "@openmirai/calculator-core"
+    `import { CalculatorEngine, evaluateExpression } from "@openmirai/calculator-core"
+import type { CalculatorValue } from "@openmirai/calculator-core"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
+import type { CalculatorTheme } from "@openmirai/calculator-core/configuration"
 import {
   CalculatorEngine as SubpathCalculatorEngine,
   evaluateExpression as subpathEvaluateExpression,
-  type CalculatorEngineOptions,
 } from "@openmirai/calculator-core/engine"
-import {
-  compileGraphExpression as subpathCompileGraphExpression,
-  type GraphPoint,
-} from "@openmirai/calculator-core/graphing"
-import {
-  calculateStatistics as subpathCalculateStatistics,
-  type DescriptiveStatistics,
-} from "@openmirai/calculator-core/statistics"
-import {
-  calculatePercent as subpathCalculatePercent,
-  type PercentResults,
-} from "@openmirai/calculator-core/tools"
+import type { CalculatorEngineOptions } from "@openmirai/calculator-core/engine"
+import { compileGraphExpression } from "@openmirai/calculator-core/graphing"
+import type { CompiledGraphExpression } from "@openmirai/calculator-core/graphing"
+import type { GraphingInitialData } from "@openmirai/calculator-core/graphing-data"
+import { graphPointToViewport } from "@openmirai/calculator-core/graphing-view"
+import type { GraphPoint, GraphView } from "@openmirai/calculator-core/graphing-view"
+import { calculateStatistics } from "@openmirai/calculator-core/statistics"
+import type { DescriptiveStatistics } from "@openmirai/calculator-core/statistics"
+import { parseNumberList } from "@openmirai/calculator-core/statistics-data"
+import type { StatisticsInitialData } from "@openmirai/calculator-core/statistics-data"
+import { calculatePercent } from "@openmirai/calculator-core/tools"
+import type { PercentResults } from "@openmirai/calculator-core/tools"
 
 export const rootValue: CalculatorValue = evaluateExpression("1 + 1")
 export const rootEngine = new CalculatorEngine()
-export const rootGraph: CompiledGraphExpression = compileGraphExpression("x", rootEngine)
-export const rootStatistics = calculateStatistics([1, 2])
-export const rootPercent = calculatePercent(1, 2)
 export const engineOptions: CalculatorEngineOptions = {}
 export const subpathEngine = new SubpathCalculatorEngine(engineOptions)
 export const subpathValue: CalculatorValue = subpathEvaluateExpression("2 + 2")
+export const extension = CalculatorExtension.SCIENTIFIC
+export const theme: CalculatorTheme = "system"
 export const point: GraphPoint = { x: 0, y: 0 }
-export const subpathGraph: CompiledGraphExpression = subpathCompileGraphExpression(
-  "x",
-  subpathEngine
-)
-export const statistics: DescriptiveStatistics = subpathCalculateStatistics([1, 2])
-export const percent: PercentResults = subpathCalculatePercent(1, 2)
+export const view: GraphView = { xmin: -10, xmax: 10, ymin: -10, ymax: 10 }
+export const viewportPoint = graphPointToViewport(point, view, 100, 100)
+export const graphingData: GraphingInitialData = { expressions: [] }
+export const subpathGraph: CompiledGraphExpression = compileGraphExpression("x", subpathEngine)
+export const statistics: DescriptiveStatistics = calculateStatistics([1, 2])
+export const parsedStatistics = parseNumberList("1, 2")
+export const statisticsData: StatisticsInitialData = { xValues: [1, 2] }
+export const percent: PercentResults = calculatePercent(1, 2)
 `
   )
   await writeFile(
@@ -249,12 +241,9 @@ export const percent: PercentResults = subpathCalculatePercent(1, 2)
   if (installedPackage.name !== packageName || installedPackage.version !== "0.2.0") {
     throw new Error("Tarball installed with the wrong package identity")
   }
-
-  console.log("Headless calculator core tarball smoke passed for ESM, CommonJS, and TypeScript.")
 } finally {
   if (!process.env.MIRAI_KEEP_SMOKE) {
     await rm(workspace, { force: true, recursive: true })
   } else {
-    console.log(`Kept package smoke workspace at ${workspace}`)
   }
 }

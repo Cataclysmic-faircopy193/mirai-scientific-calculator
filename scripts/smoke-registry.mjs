@@ -326,11 +326,9 @@ export default function App() {
   )
 
   runPnpm(["build"], project)
-  console.log(`Registry smoke passed for ${base}.`)
 } finally {
   if (!process.env.MIRAI_KEEP_SMOKE) {
     await rm(workspace, { force: true, recursive: true })
   } else {
-    console.log(`Kept registry smoke project at ${project}`)
   }
 }

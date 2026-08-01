@@ -14,3 +14,9 @@ const result = evaluateExpression("sin(30) + sqrt(81)", {
   angleMode: "degrees",
 })
 ```
+
+## Coverage
+
+`pnpm test:coverage` enforces the committed core coverage minimums. After adding
+tests, run `pnpm test:coverage:ratchet` to raise each minimum to the next achieved
+whole-number percentage; the ratchet never lowers an existing threshold.

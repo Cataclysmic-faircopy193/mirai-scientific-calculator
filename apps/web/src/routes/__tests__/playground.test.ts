@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 
-import { CalculatorExtension } from "@/components/mirai-calculator/mirai-calculator"
 import {
   createPlaygroundSnippet,
   movePlaygroundExtension,
@@ -10,6 +9,7 @@ import {
   PLAYGROUND_STATISTICS_DATA,
   PLAYGROUND_TOOLS_DATA,
 } from "@/site/constants/playground"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 
 describe("playground search state", () => {
   it("opens the practice backdrop by default", () => {

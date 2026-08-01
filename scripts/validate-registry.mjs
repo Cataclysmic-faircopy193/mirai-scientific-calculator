@@ -81,5 +81,3 @@ for (const file of calculator.files) {
 
   targets.add(file.target)
 }
-
-console.log(`Validated ${calculator.files.length} calculator registry files.`)

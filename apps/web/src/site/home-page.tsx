@@ -2,11 +2,7 @@ import { useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { ArrowRight, PackageOpen } from "lucide-react"
 
-import {
-  CalculatorExtension,
-  MiraiCalculator,
-  type CalculatorExtension as CalculatorExtensionValue,
-} from "@/components/mirai-calculator/mirai-calculator"
+import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { CodeBlock } from "@/site/code-block"
@@ -15,6 +11,8 @@ import { DISTRIBUTION_LAYERS } from "@/site/constants/home"
 import { DEFAULT_PLAYGROUND_SEARCH } from "@/site/constants/playground"
 import { SITE_DESCRIPTION } from "@/site/constants/site"
 import { EXTENSIONS } from "@/site/site-data"
+import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
+import type { CalculatorExtension as CalculatorExtensionValue } from "@openmirai/calculator-core/configuration"
 
 const DEFAULT_ACTIVE_EXTENSION = CalculatorExtension.SCIENTIFIC
 
@@ -34,7 +32,7 @@ export function HomePage() {
         <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 md:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.8fr)] lg:items-center lg:px-10 lg:py-28">
           <div>
             <p className="text-sm font-medium text-primary">Open source · React · shadcn</p>
-            <h1 className="mt-5 max-w-3xl text-5xl leading-[1.02] font-semibold tracking-[-0.05em] text-balance sm:text-6xl">
+            <h1 className="mt-5 max-w-3xl text-5xl leading-[1.02] font-semibold tracking-tighter text-balance sm:text-6xl">
               A scientific calculator you install as source.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
@@ -95,7 +93,7 @@ export function HomePage() {
           ))}
         </div>
 
-        <div className="mt-5 h-[650px]">
+        <div className="mt-5 h-162.5">
           <MiraiCalculator
             extensions={[activeExtension]}
             mode={activeExtension}

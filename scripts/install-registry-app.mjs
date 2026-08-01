@@ -32,7 +32,9 @@ try {
   for (const entry of await readdir(installedCalculatorDirectory, {
     withFileTypes: true,
   })) {
-    if (entry.name === "__tests__") continue
+    if (entry.name === "__tests__") {
+      continue
+    }
     await rm(path.join(installedCalculatorDirectory, entry.name), {
       force: true,
       recursive: entry.isDirectory(),
