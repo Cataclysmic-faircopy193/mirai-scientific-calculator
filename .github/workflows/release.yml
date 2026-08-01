@@ -11,7 +11,12 @@ jobs:
   release:
     name: Publish committed core version
     runs-on: ubuntu-latest
+    environment:
+      name: cloudflare-production
+      url: https://calculator.openmirai.dev
     env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       HUSKY: "0"
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -45,9 +50,3 @@ jobs:
 
       - name: Release existing package version
         run: pnpm exec release-it --ci --no-increment
-
-  deploy-site:
-    name: Deploy tagged site to Cloudflare
-    needs: release
-    uses: ./.github/workflows/cloudflare-deploy.yml
-    secrets: inherit

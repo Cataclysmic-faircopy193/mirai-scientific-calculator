@@ -23,6 +23,7 @@
   "hooks": {
     "before:init": "pnpm release:check",
     "before:release": "pnpm release:assets",
-    "after:npm:release": "pnpm release:verify-published"
+    "after:npm:release": "pnpm release:verify-published",
+    "after:release": "pnpm deploy:site"
   }
 }
