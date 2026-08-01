@@ -12,18 +12,18 @@
   },
   "npm": {
     "publish": true,
-    "publishPath": "packages/calculator-core",
+    "publishPath": ".",
     "publishArgs": ["--access", "public", "--provenance"]
   },
   "github": {
-    "assets": ["release/**/*"],
+    "assets": ["../../release/**/*"],
     "release": true,
     "releaseName": "v${version}"
   },
   "hooks": {
-    "before:init": "pnpm release:check",
-    "before:release": "pnpm release:assets",
-    "after:npm:release": "pnpm release:verify-published",
-    "after:release": "pnpm deploy:site"
+    "before:init": "pnpm --dir ../.. release:check",
+    "before:release": "pnpm --dir ../.. release:assets",
+    "after:npm:release": "pnpm --dir ../.. release:verify-published",
+    "after:release": "pnpm --dir ../.. deploy:site"
   }
 }

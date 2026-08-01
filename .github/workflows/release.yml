@@ -2,6 +2,12 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      npm_only:
+        description: Retry only npm publication after a partial release
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,4 +55,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Release existing package version
-        run: pnpm exec release-it --ci --no-increment
+        if: ${{ !inputs.npm_only }}
+        run: pnpm release
+
+      - name: Recover npm publication after a partial release
+        if: ${{ inputs.npm_only }}
+        run: >-
+          pnpm --dir packages/calculator-core exec release-it
+          --config ../../.release-it.json
+          --ci --no-increment --no-git --no-github

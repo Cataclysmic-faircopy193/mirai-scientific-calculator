@@ -1,0 +1,27 @@
+name: Deprecate legacy npm package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deprecate:
+    name: Deprecate all legacy versions
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+          registry-url: https://registry.npmjs.org
+
+      - name: Deprecate mirai-scientific-calculator
+        run: >-
+          npm deprecate "mirai-scientific-calculator@*"
+          "Deprecated: install @openmirai/calculator-core for the headless library,
+          or pnpm dlx shadcn@latest add @openmirai/calculator for the editable UI."

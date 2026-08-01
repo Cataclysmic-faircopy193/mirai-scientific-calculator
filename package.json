@@ -30,7 +30,7 @@
     "release:check": "pnpm check && pnpm smoke:registry && pnpm smoke:package",
     "release:assets": "node scripts/prepare-release-assets.mjs",
     "release:verify-published": "node scripts/verify-published.mjs",
-    "release": "release-it --ci --no-increment",
+    "release": "pnpm --dir packages/calculator-core exec release-it --config ../../.release-it.json --ci --no-increment",
     "prepare": "husky"
   },
   "devDependencies": {
