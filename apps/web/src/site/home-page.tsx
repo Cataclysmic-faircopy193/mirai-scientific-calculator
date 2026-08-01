@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
-import { ArrowRight, PackageOpen } from "lucide-react"
+import { ArrowRight, ExternalLink, PackageOpen } from "lucide-react"
 
 import { MiraiCalculator } from "@/components/mirai-calculator/mirai-calculator"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { CodeBlock } from "@/site/code-block"
 import { INSTALL_COMMAND } from "@/site/constants/docs"
-import { DISTRIBUTION_LAYERS } from "@/site/constants/home"
+import { DISTRIBUTION_LAYERS, RELEASE_LINKS } from "@/site/constants/home"
 import { DEFAULT_PLAYGROUND_SEARCH } from "@/site/constants/playground"
-import { SITE_DESCRIPTION } from "@/site/constants/site"
+import { CURRENT_RELEASE, CURRENT_RELEASE_URL, SITE_DESCRIPTION } from "@/site/constants/site"
 import { EXTENSIONS } from "@/site/site-data"
 import { CalculatorExtension } from "@openmirai/calculator-core/configuration"
 import type { CalculatorExtension as CalculatorExtensionValue } from "@openmirai/calculator-core/configuration"
@@ -31,7 +32,17 @@ export function HomePage() {
       <section className="border-b">
         <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 md:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.8fr)] lg:items-center lg:px-10 lg:py-28">
           <div>
-            <p className="text-sm font-medium text-primary">Open source · React · shadcn</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge
+                variant="secondary"
+                render={
+                  <a href={CURRENT_RELEASE_URL} target="_blank" rel="noreferrer">
+                    {CURRENT_RELEASE} released
+                  </a>
+                }
+              />
+              <p className="text-sm font-medium text-primary">Open source · React · shadcn</p>
+            </div>
             <h1 className="mt-5 max-w-3xl text-5xl leading-[1.02] font-semibold tracking-tighter text-balance sm:text-6xl">
               A scientific calculator you install as source.
             </h1>
@@ -57,7 +68,28 @@ export function HomePage() {
             </div>
           </div>
 
-          <CodeBlock code={INSTALL_COMMAND} label="Install with shadcn" language="shell" />
+          <div className="grid gap-3">
+            <CodeBlock code={INSTALL_COMMAND} label="Install with shadcn" language="shell" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              {RELEASE_LINKS.map((item) => (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group rounded-xl border bg-card p-4 transition-colors hover:bg-muted/60"
+                >
+                  <span className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+                    {item.label}
+                    <ExternalLink className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </span>
+                  <span className="mt-2 block truncate font-mono text-sm text-foreground">
+                    {item.value}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

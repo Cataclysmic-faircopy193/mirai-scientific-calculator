@@ -1,7 +1,9 @@
 # Mirai Scientific Calculator
 
 [![CI](https://img.shields.io/github/actions/workflow/status/openmirai/mirai-scientific-calculator/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/openmirai/mirai-scientific-calculator/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@openmirai/calculator-core?style=flat-square&label=core)](https://www.npmjs.com/package/@openmirai/calculator-core)
 [![GitHub Release](https://img.shields.io/github/v/release/openmirai/mirai-scientific-calculator?style=flat-square)](https://github.com/openmirai/mirai-scientific-calculator/releases)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2Fcalculator.openmirai.dev&style=flat-square&label=website)](https://calculator.openmirai.dev)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2A9D90?style=flat-square)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-ready-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 
@@ -11,8 +13,15 @@ distribution channels:
 - **Editable React UI:** the `@openmirai/calculator` shadcn registry item
 - **Headless APIs:** the dependency-free `@openmirai/calculator-core` npm package
 
-The UI preserves the OpenMirai practice-player interface. The core package
-provides the same calculation engines without React, styles, or UI dependencies.
+The registry provides the responsive calculator component as editable source.
+The core package provides the calculation engines without React, styles, or UI
+dependencies.
+
+[Website](https://calculator.openmirai.dev) ·
+[Playground](https://calculator.openmirai.dev/playground) ·
+[Installation](https://calculator.openmirai.dev/docs/installation) ·
+[Core API](https://calculator.openmirai.dev/docs/core) ·
+[v0.2.0 release](https://github.com/openmirai/mirai-scientific-calculator/releases/tag/v0.2.0)
 
 ## Interface
 
@@ -69,9 +78,8 @@ The registry item copies the calculator into
 installs `@openmirai/calculator-core`. The copied component owns its styles, so
 there is no separate UI package or stylesheet package to install.
 
-The calculator preserves the layout and control baseline from `v0.1.6`. The
-OpenMirai wordmark is embedded directly in the calculator chrome, without an
-external logo asset or branding toggle.
+The calculator preserves the layout and control baseline from `v0.1.6` while
+leaving product branding and surrounding practice scenery to the host app.
 
 The registry supports projects initialized with Base UI or Radix without
 replacing unrelated components or global theme variables.
@@ -289,14 +297,19 @@ it is not published as an npm package or bundled as a package release asset.
 
 ### Release status
 
-Normal checks and merges do not publish `@openmirai/calculator-core` or
-deprecate any package. Publishing requires a manual Release workflow dispatch,
-and any deprecation remains a separate future manual action.
+[`@openmirai/calculator-core@0.2.0`](https://www.npmjs.com/package/@openmirai/calculator-core)
+is published with npm provenance. The matching
+[`v0.2.0`](https://github.com/openmirai/mirai-scientific-calculator/releases/tag/v0.2.0)
+GitHub Release includes the package tarball and generated registry artifacts.
+The interactive showcase is live at
+[`calculator.openmirai.dev`](https://calculator.openmirai.dev).
+The legacy `mirai-scientific-calculator` releases `0.1.0` through `0.1.6` remain
+available but are deprecated with migration guidance; they were not unpublished.
 
-The `@openmirai/calculator` command is the intended sole UI installation
-surface. It becomes resolvable after the hosted registry is live and the
-namespace is accepted into the shadcn registry directory; no fallback install
-command is required or documented here.
+Future publishing remains an explicit Release workflow dispatch. Release-it
+validates the checkout, publishes the committed core version, creates the Git
+tag and GitHub Release, uploads the generated assets, verifies npm, and deploys
+the showcase. Package deprecation stays a separate manual-only workflow.
 
 ## License
 

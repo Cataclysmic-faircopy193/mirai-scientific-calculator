@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/sheet"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import {
+  CURRENT_RELEASE,
+  CURRENT_RELEASE_URL,
   FOOTER_NAVIGATION,
   GITHUB_URL,
   MOBILE_NAVIGATION,
@@ -158,6 +160,14 @@ function ShellContent() {
             ))}
             <a href="/llms.txt" className="transition-colors hover:text-foreground">
               llms.txt
+            </a>
+            <a
+              href={CURRENT_RELEASE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="transition-colors hover:text-foreground"
+            >
+              {CURRENT_RELEASE}
             </a>
           </div>
         </div>

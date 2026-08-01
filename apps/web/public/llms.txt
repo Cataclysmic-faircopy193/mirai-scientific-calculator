@@ -16,6 +16,11 @@ pnpm dlx shadcn@latest add @openmirai/calculator
 - [Installation](/docs/installation)
 - [Core API](/docs/core)
 
+## Release
+
+- [@openmirai/calculator-core@0.2.0](https://www.npmjs.com/package/@openmirai/calculator-core)
+- [v0.2.0 release notes](https://github.com/openmirai/mirai-scientific-calculator/releases/tag/v0.2.0)
+
 ## Extensions
 
 - [Scientific](/extensions/scientific)

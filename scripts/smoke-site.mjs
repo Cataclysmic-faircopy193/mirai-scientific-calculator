@@ -39,6 +39,20 @@ if (!llmsText.includes("pnpm dlx shadcn@latest add @openmirai/calculator")) {
   throw new Error("llms.txt does not include the canonical installation command")
 }
 
+if (!llmsText.includes("@openmirai/calculator-core@0.2.0")) {
+  throw new Error("llms.txt does not include the published core release")
+}
+
+if (!indexHtml.includes("https://calculator.openmirai.dev/open-graph.png")) {
+  throw new Error("index.html does not reference the social preview image")
+}
+
+try {
+  await access(path.join(siteDirectory, "open-graph.png"))
+} catch {
+  throw new Error("The built site does not include open-graph.png")
+}
+
 for (const expectedHeader of [
   "/assets/*",
   "max-age=31536000, immutable",

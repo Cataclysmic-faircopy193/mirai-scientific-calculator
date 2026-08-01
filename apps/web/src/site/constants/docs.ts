@@ -1,3 +1,5 @@
+import { CORE_PACKAGE_NAME, CORE_PACKAGE_VERSION } from "@/site/constants/site"
+
 export const DOCS_NAVIGATION = [
   { label: "Installation", to: "/docs/installation" },
   { label: "Headless core", to: "/docs/core" },
@@ -28,7 +30,7 @@ export function CalculatorWorkspace() {
   )
 }`
 
-export const CORE_INSTALL_COMMAND = "pnpm add @openmirai/calculator-core"
+export const CORE_INSTALL_COMMAND = `pnpm add ${CORE_PACKAGE_NAME}@${CORE_PACKAGE_VERSION}`
 
 export const CORE_EXAMPLE = `import { evaluateExpression } from "@openmirai/calculator-core/engine"
 import { calculateStatistics } from "@openmirai/calculator-core/statistics"

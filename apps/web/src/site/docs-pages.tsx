@@ -1,5 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router"
-import { CheckCircle2, PackageOpen, Shapes } from "lucide-react"
+import { CheckCircle2, ExternalLink, PackageOpen, Shapes } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import {
   INSTALL_COMMAND,
   INSTALLATION_NOTES,
 } from "@/site/constants/docs"
+import { CORE_PACKAGE_URL, CURRENT_RELEASE, CURRENT_RELEASE_URL } from "@/site/constants/site"
 
 /** Renders the shared documentation navigation and nested route outlet. */
 export function DocsLayout() {
@@ -120,7 +121,17 @@ export function InstallationPage() {
 export function CorePage() {
   return (
     <div>
-      <Badge variant="secondary">Framework-independent</Badge>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">Framework-independent</Badge>
+        <Badge
+          variant="outline"
+          render={
+            <a href={CURRENT_RELEASE_URL} target="_blank" rel="noreferrer">
+              {CURRENT_RELEASE} published
+            </a>
+          }
+        />
+      </div>
       <h1 className="mt-5 text-4xl font-semibold tracking-[-0.045em]">Headless core</h1>
       <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
         <code className="font-mono text-base text-foreground">@openmirai/calculator-core</code>{" "}
@@ -133,6 +144,36 @@ export function CorePage() {
       </div>
       <div className="mt-5">
         <CodeBlock code={CORE_EXAMPLE} label="core-example.ts" language="ts" />
+      </div>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={
+            <a
+              href={CORE_PACKAGE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View @openmirai/calculator-core on npm"
+            />
+          }
+        >
+          View on npm <ExternalLink />
+        </Button>
+        <Button
+          variant="ghost"
+          nativeButton={false}
+          render={
+            <a
+              href={CURRENT_RELEASE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`View ${CURRENT_RELEASE} release notes`}
+            />
+          }
+        >
+          Release notes <ExternalLink />
+        </Button>
       </div>
 
       <Separator className="my-12" />
